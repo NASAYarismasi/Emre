@@ -15,7 +15,7 @@ export const SYSTEMS = {
     title: 'Perseverance · Rover bilgisayarı', prompt: 'E · Rover bilgisayarı', controls: [],
     status: t => t.rover.mode === 'parked' ? 'idle' : 'on',
     readouts: t => roverReadouts(t.rover),
-    note: 'NASA/JPL: en çok 0,042 m/sn; MMRTG başlangıç gücü ≈110 W; iki 43 Ah batarya; 43 tüp (5 tanık). [ / ] ile yüzey zamanını hızlandır. Rotalar, enerji yükleri, işlem süreleri ve bilim verileri eğitsel oyun varsayımlarıdır; gerçek Jezero ölçümleri değildir. SHERLOC adayı yaşam kanıtı sayılmaz.',
+    note: 'NASA/JPL: en çok 0,042 m/sn; MMRTG ≈110 W; iki 43 Ah batarya; 43 tüp (5 tanık). Rover zamanı ×10 hızlandırılmış (oyun varsayımı); [ / ] koloni zaman çarpanı ayrıca uygulanır. Otonom kampanya 280 m keşif halkalarına açılır, bilim yapar ve düşük bataryada üsse döner. Rotalar, yükler, süreler ve bilim verileri eğitsel oyun varsayımlarıdır. SHERLOC adayı yaşam kanıtı sayılmaz.', // ROVER2
   },
   air: {
     title: 'Hava tesisi · O₂ üretimi ve CO₂ temizleme', prompt: 'E · Hava tesisi bilgisayarı',

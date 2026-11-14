@@ -726,7 +726,7 @@ function makeScene() {
 // Integration (Emre): models are served from public/models/colony instead of base64 blocks
 // embedded in the single-file build; Draco decoder comes from public/draco.
 const modelFiles = {
-  "rover-data": "perseverance.glb",
+  "rover-data": "perseverance-wheels.glb", // ROVER2: NASA derivative with six hub-centred wheel objects.
   "team-crew-data": "team-astronaut-walk.glb", // arms-down, jointed limbs (scripts/pose-walker.py)
 }
 async function loadBytes(id, signal) {

@@ -137,12 +137,14 @@ export function mapBaseMarkers(snapshot) {
 
 function baseMap(snapshot, roverOnly = false) {
   const markers = mapBaseMarkers(snapshot);
-  const extentX = markers.map(p => p.x), extentZ = markers.map(p => p.z);
+  const fixedMarkers = markers.filter(p => !['rover','player','crew'].includes(p.kind)); // ROVER2: keep the base readable while the camera follows the rover.
+  const extentX = fixedMarkers.map(p => p.x), extentZ = fixedMarkers.map(p => p.z); // ROVER2
   const minX = Math.min(-85, ...extentX) - 9, minZ = Math.min(-42, ...extentZ) - 12;
   const width = Math.max(80, ...extentX) + 12 - minX, height = Math.max(75, ...extentZ) + 8 - minZ;
   const scale = Math.max(width / 400, height / 230), mapW = scale * 400, mapH = scale * 230;
   const shapes = markers.map(p => {
-    const x = p.x - minX, z = p.z - minZ;
+    const x = p.kind === 'rover' ? Math.max(9, Math.min(mapW-9,p.x-minX)) : p.x-minX, z = p.kind === 'rover' ? Math.max(17,Math.min(mapH-24,p.z-minZ)) : p.z-minZ; // ROVER2: edge clamp preserves live bearing.
+    if(p.kind === 'rover') return `<g class="map-rover"><title>Rover · X ${f(p.x)} / Z ${f(p.z)} m</title><circle cx="${x}" cy="${z}" r="2.6"/><text x="${x}" y="${z+12}" text-anchor="${x>mapW/2?'end':'start'}" style="text-anchor:${x>mapW/2?'end':'start'};font-size:${mapW/(roverOnly?24:35)}px;fill:#f0c278;stroke:none">ROVER · ${f(snapshot.rover.distanceFromBaseM)} m</text></g>`; // ROVER2: readable distance stays visible on both maps.
     const shape = p.kind === 'dome' ? `<circle cx="${x}" cy="${z}" r="4.3"/>`
       : p.kind === 'solar' ? `<rect x="${x - 20}" y="${z - 24}" width="40" height="48" rx="1"/><path d="M${x-20} ${z-8}h40m-40 16h40m-27-32v48m14-48v48"/>`
       : p.kind === 'greenhouse' ? `<rect x="${x-5}" y="${z-6}" width="10" height="12" rx="3"/>`
