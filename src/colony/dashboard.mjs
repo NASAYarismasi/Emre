@@ -177,12 +177,14 @@ function renderDashboard(s, history) {
 
 function measurementTable(measurements) {
   if (!measurements.length) return '<div class="dash-no-data">Henüz ölçüm kaydı yok.</div>';
-  return `<table><thead><tr><th>Konum / kayıt</th><th>Ölçüm</th><th>Değer</th></tr></thead><tbody>${measurements.slice(0,5).map((m,i)=>{
+  return `<table><thead><tr><th>İstasyon</th><th>Cihaz</th><th>Sonuç</th></tr></thead><tbody>${measurements.slice(0,5).map((m,i)=>{
     const position = positionOf(m.position ?? m);
-    // Rover telemetry can supply typed scalar records or a set of named sensor values.
-    const values = m.value !== undefined ? `${escape(finite(m.value)?f(m.value):m.value)} ${escape(m.unit ?? '')}`
-      : Object.entries(m).filter(([k,v])=>finite(v)&&!['x','y','z','time','timestamp','sol','id'].includes(k)).map(([k,v])=>`${escape(k)}: ${f(v)}`).join(' · ') || '—';
-    return `<tr><td>${position?`${f(position.x)}, ${f(position.z)} m`:`#${measurements.length-i}`}</td><td>${escape(m.label??m.type??m.kind??'Yüzey taraması')}</td><td>${values}</td></tr>`;
+    // src/sim/rover.js records {instrument, stationName, summary, values}; older/typed records use value/unit.
+    const values = m.summary ? escape(m.summary)
+      : m.value !== undefined ? `${escape(finite(m.value)?f(m.value):m.value)} ${escape(m.unit ?? '')}`
+      : Object.entries(m).filter(([k,v])=>finite(v)&&!['x','y','z','time','timestamp','sol','id','elapsedS'].includes(k)).map(([k,v])=>`${escape(k)}: ${f(v)}`).join(' · ') || '—';
+    const where = m.stationName ?? (position ? `${f(position.x)}, ${f(position.z)} m` : `#${measurements.length-i}`);
+    return `<tr><td>${escape(where)}</td><td>${escape(m.instrument??m.label??m.type??m.kind??'Yüzey taraması')}</td><td>${values}</td></tr>`;
   }).join('')}</tbody></table>`;
 }
 
