@@ -33,7 +33,7 @@ it('slows down in advance of every forecast and holds real time after events', (
       expect(pacingTarget({phase,timeToEvent:0,sinceEvent:100})).toBe(1);
     }
   }
-  expect(pacingTarget({phase:'EDL',timeToTouchdown:60,sinceEvent:100})).toBe(1);
+  expect(pacingTarget({phase:'EDL',timeToTouchdown:PACING.landingRealtime-5,sinceEvent:100})).toBe(1); // final descent in real time
 });
 
 it('manual warp remains latched until the explicit automatic toggle and reset', () => {
@@ -78,10 +78,10 @@ it('runs the headless director with the actual warp guard and measures feasible 
   const lowerBound=plan.phases.CRUISE/PACING.cruise+(plan.phases.TMI_BURN+plan.phases.MOI_BURN)/PACING.burn;
   expect(lowerBound).toBeLessThan(180);
   console.log('PACING_TOTAL_S', Math.round(seconds), 'CHAPTER2_S', Math.round(chapter2), JSON.stringify(Object.fromEntries(Object.entries(durations).map(([k,v])=>[k,Math.round(v)]))));
-  expect(seconds).toBeGreaterThan(4*60);
-  expect(seconds).toBeLessThan(9.5*60);
-  expect(chapter2).toBeGreaterThan(90);
-  expect(chapter2).toBeLessThan(7*60);
+  expect(seconds).toBeGreaterThan(90);
+  expect(seconds).toBeLessThan(3.2*60); // team lead: whole flight ≤ ~3 min
+  expect(chapter2).toBeGreaterThan(PACING.landingRealtime);
+  expect(chapter2).toBeLessThan(2*60);
   console.info('PACING measured real seconds',JSON.stringify({total:seconds,chapter2,phases:durations,eventRates}));
 },20000);
 

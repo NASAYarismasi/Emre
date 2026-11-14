@@ -15,8 +15,8 @@ it('allows every requested warp only in the allowed flight environment', () => {
   const state = { engineFiring: false, inAtmosphere: false }, step = vi.fn();
   const loop = createLoop({ step, getState: () => state });
   for (const warp of WARPS) expect(loop.setWarp(warp)).toBe(true);
-  state.engineFiring = true; expect(loop.setWarp(1000)).toBe(false); expect(loop.setWarp(50)).toBe(true); expect(loop.setWarp(10)).toBe(true); // vacuum burn ≤ ×50
-  state.engineFiring = false; state.inAtmosphere = true; expect(loop.setWarp(1000)).toBe(false);
+  state.engineFiring = true; expect(loop.setWarp(100000)).toBe(false); expect(loop.setWarp(1000)).toBe(true); expect(loop.setWarp(10)).toBe(true); // vacuum burn ≤ ×1000
+  state.engineFiring = false; state.inAtmosphere = true; expect(loop.setWarp(1000)).toBe(false); expect(loop.setWarp(50)).toBe(true);
   expect(loop.setWarp(3)).toBe(false);
 });
 it('batches only safe fixed coast ticks, then reduces warp before firing engines', () => {

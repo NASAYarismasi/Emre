@@ -1,8 +1,9 @@
 import { createMission } from '../sim/mission.js';
 
 // GAME ASSUMPTION: presentation choices, never flight dynamics or event triggers.
-export const PACING = Object.freeze({ easingSeconds: 2, logSlope: 1.8, eventLead: 4, eventHold: 3,
-  ascent: 6, burn: 50, coast: 600, cruise: 400000, edl: 8, orbitDwell: 12 });
+// Team lead: whole flight in 2–3 real minutes. Key events still play at ×1 (shorter lead/hold).
+export const PACING = Object.freeze({ easingSeconds: .8, logSlope: 3, eventLead: 2, eventHold: 1.2, landingRealtime: 25,
+  ascent: 35, burn: 1000, coast: 20000, cruise: 3000000, edl: 35, orbitDwell: 2 });
 
 /** Compute a deterministic reference through public flight commands. Event times are
  * predictions only; the live mission remains the authority for every transition.
@@ -48,7 +49,8 @@ export function pacingTarget(frame, limits = PACING) {
   let peak = ({ ASCENT: limits.ascent, PARKING_ORBIT: limits.coast, TMI_BURN: limits.burn,
     CRUISE: limits.cruise, MOI_BURN: limits.burn, MARS_ORBIT: limits.coast, DEORBIT: limits.coast, EDL: limits.edl })[phase] ?? 1;
   if (phase === 'PARKING_ORBIT' || phase === 'MARS_ORBIT') peak = 1;
-  if (phase === 'EDL' && frame.timeToTouchdown < 65) peak = 1;
+  // Final descent (retro-rockets, dust plume, touchdown) always plays in real time.
+  if (phase === 'EDL' && frame.timeToTouchdown < limits.landingRealtime) peak = 1;
   if (sinceEvent < limits.eventHold) return 1;
   // Braking envelope leaves both the logarithmic deceleration distance and
   // the easing lag ahead of the event. A long cruise cannot jump over ignition.

@@ -55,7 +55,7 @@ it('does not consume fuel during a zero-throttle burn and aborts without proceed
   m.burn(); m.setThrottle(0);
   const fuel = m.state.transit.propellant;
   m.step(.02); expect(m.state.transit.propellant).toBe(fuel);
-  expect(m.setWarp(1000)).toBe(true);
+  expect(m.setWarp(100000)).toBe(true);
   m.setThrottle(1); expect(m.state.warp).toBe(10); expect(m.getTelemetry().engineFiring).toBe(true);
   m.abort(); const t = m.state.time;
   m.step(1); expect(m.state.time).toBe(t); expect(m.state.phase).toBe('FAILED');
