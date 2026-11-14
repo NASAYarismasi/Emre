@@ -7,6 +7,7 @@ import { createFirstPerson, placeholderAstronaut } from "./mars-fps.mjs"
 // IHAN-SRC: real ?han source replaces recovered construction.
 import { createOvaWorld } from '../ihan/crater-ecosystem.mjs'
 import { createOvaNavigation } from '../ihan/navigation.mjs'
+import { createHabitatRooms, ROOM_NAMES } from '../ihan/habitat-rooms.mjs' // SAMET-HAB
 import { prepareOvaRover } from '../ihan/assets.mjs'
 // IHAN-SRC: installation host; no standalone renderer or loop.
 import { createLifeSupportFacilities } from '../ihan/life-support.mjs'
@@ -79,10 +80,12 @@ function makeScene() {
   controls.maxDistance = 380
   const environment = createEnvironment(scene, camera, canvas)
   const ova = createOvaWorld(scene)
+  const habitatRooms = createHabitatRooms(ova) // SAMET-HAB: install before host static batching.
   // Host perf: İhan's domes/tunnels (~330 parts) and the 108 horizon mounds never move -> per-material batches.
   for (const root of [scene.getObjectByName('Ihan_pressurised_habitat'), ...scene.children.filter(o => o.isGroup && o.children.length > 50 && o.children.every(c => c.isMesh && !c.children.length))]) if (root) {
     const hatches = new Set(ova.locks.flatMap(lock => [lock.inner, lock.outer]));
     for (const hatch of hatches) batchStaticLeaves(hatch);
+    hatches.add(habitatRooms.root); // SAMET-HAB: rooms already batched; preserve the sliding curtain.
     batchStaticLeaves(root, hatches);
   }
   const navigation = createOvaNavigation(ova)
@@ -316,7 +319,7 @@ function makeScene() {
         ? modules[target.item.type].name + (canAccess ? " · R ile çatı görüşü" : "")
         : show ? candidate.error ?? (target.position.supportId ? "E · Çatıya monte et" : "E · Zemine yerleştir") : ""
       // IHAN-SRC: greenhouse airlock prompt takes priority near its own doors.
-      const airlock = lifeSupport.prompt(camera) || (navigation.nearAirlock(camera.position.x,camera.position.z)
+      const airlock = lifeSupport.prompt(camera) || (navigation.inside && habitatRooms.prompt(camera.position.x,camera.position.z)) || (navigation.nearAirlock(camera.position.x,camera.position.z) // SAMET-HAB
         ? (navigation.inside ? 'E · Hava kilidinden çık' : 'E · Hava kilidinden gir') : label)
       if (aimLabel.textContent !== airlock) aimLabel.textContent = airlock
 
@@ -370,6 +373,7 @@ function makeScene() {
     interact: () => {
       // IHAN-SRC: E -> chamber -> pressure cycle -> E -> second door.
       if (lifeSupport.interact(camera, fps)) return
+      if (navigation.inside && habitatRooms.interact(camera.position.x,camera.position.z)) return // SAMET-HAB
       const transition = navigation.interact(camera.position.x,camera.position.z)
       if (transition) {
         fps.teleport(new T.Vector3(transition.x,transition.y+1.65,transition.z),0,transition.yaw)
@@ -470,6 +474,7 @@ function makeScene() {
     // IHAN-SRC: drive vendor calculations from the same Mars clock, including warp.
     lifeSupport.update(delta, environment.telemetry, camera, fps)
     environment.setLifeSupport(lifeSupport.telemetry)
+    habitatRooms.update(delta, () => ({ lifeSupport: lifeSupport.telemetry, rover: roverAgent.telemetry })) // SAMET-HAB: <= 2 Hz, same observer data.
     tracks.update(delta)
     crewAgents.update(delta, { state, playerId, fpsActive: fps.active, camera, speed: environment.telemetry.warp })
     if (fps.active) fps.update(delta, updateAim)
@@ -489,6 +494,7 @@ function makeScene() {
     world:'duz-ova', view:currentView, insideHabitat:navigation.inside, assets:{crew:Boolean(teamCharacter),rover:reference.children.length>0},
     fps: fps.active, player: fps.telemetry, environment: environment.telemetry,
     lifeSupport: lifeSupport.telemetry, // IHAN-SRC: deterministic observer contract
+    habitat: habitatRooms.telemetry, // SAMET-HAB: expose actual screen data for browser verification.
     crewAgents: crewAgents.telemetry,
     rover: roverAgent.telemetry, // ROVER: full SI science/sample contract for dashboard.
     layout: { lander: { ...LANDER_PAD, y: crewLander.position.y }, hatchSpawn: LANDER_SPAWN, arrivalYaw,
@@ -642,6 +648,7 @@ function makeScene() {
       if (gpuFence) gl.deleteSync(gpuFence)
       observer.disconnect(); crewAgents.dispose(); lifeSupport.dispose(); fps.dispose(); ova.dispose(); // IHAN-SRC
       roverAgent.dispose() // ROVER
+      habitatRooms.dispose() // SAMET-HAB
        environment.dispose(); tracks.dispose(); controls.dispose()
       window.render_game_to_text = previousTextHook; window.advanceTime = previousAdvanceHook
       const geometries = new Set(), materials = new Set(), textures = new Set()
@@ -671,7 +678,7 @@ function makeScene() {
       navigation.reset(); roofAccess=undefined; currentView=name
       camera.position.fromArray(view.position); controls.target.fromArray(view.target); controls.update()
       for (const button of document.querySelectorAll('[data-ova-view]')) button.setAttribute('aria-pressed',String(button.dataset.ovaView===name))
-      status.textContent=name==='solar' ? 'Güneş tarlası · 42 masa · 420 panel' : name==='pad' ? 'Modül kurulum alanı · Zemine tıklayarak yerleştir.' : 'Düz Ova · İhan’ın Mars üssü'
+      status.textContent=ROOM_NAMES[name] ? `${ROOM_NAMES[name]} · Samet’in yaşam alanı · FPS: merkez hava kilidinden gir.` : name==='solar' ? 'Güneş tarlası · 42 masa · 420 panel' : name==='pad' ? 'Modül kurulum alanı · Zemine tıklayarak yerleştir.' : 'Düz Ova · İhan’ın Mars üssü' // SAMET-HAB
     },
     toggleView() {
       // Only the very first FPS entry starts at the lander ladder. Later entries resume where the
