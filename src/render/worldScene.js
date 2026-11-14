@@ -4,7 +4,6 @@ import { createPlanet, createSky } from './planet.js';
 import { createLaunchSite } from './launchSite.js';
 import { createTerrain } from './terrain.js';
 import { createVehicle } from './vehicle.js';
-import { createMarsHeatShield } from './marsLander.js';
 import { createCabin } from './cabin.js';
 import { createEffects } from './effects.js';
 import { disposeScene } from './dispose.js';
@@ -21,7 +20,7 @@ export function createWorldScene() {
       earth=createPlanet(EARTH.radius,false,ctx.assets);mars=createPlanet(MARS.radius,true,ctx.assets);sky=createSky(ctx.assets);
       pad=createLaunchSite();terrain=createTerrain();vehicle=createVehicle(ctx.assets);cabin=createCabin(ctx.assets);effects=createEffects(scene);
       scene.add(earth.group,mars.group,sky.mesh,pad.group,terrain.group,vehicle.group,cabin.group);
-      heatShield=createMarsHeatShield();heatShield.visible=false;scene.add(heatShield);
+      heatShield=new THREE.Group();heatShield.name='jettisoned-aeroshell';heatShield.visible=false;scene.add(heatShield);
       sunDisk=new THREE.Mesh(new THREE.SphereGeometry(75000,24,16),new THREE.MeshBasicMaterial({color:new THREE.Color(8,6,3)}));sunDisk.position.set(1.2e7,1.5e7,-1e7);scene.add(sunDisk);
     },
     update(pair,alpha){const s=interpolateState(pair.previous,pair.current,alpha);
@@ -38,6 +37,11 @@ export function createWorldScene() {
       const shield=s.heatShield;
       heatShield.visible=Boolean(shield&&!shield.impacted&&!onboard);
       if(heatShield.visible){
+        // Reparent the actual flight covers, never substitute another model.
+        // GAME ASSUMPTION: backshell and shield share the existing simulated
+        // jettison trace; no second debris force/mass model is invented here.
+        if(vehicle.aeroshell.parent!==heatShield)heatShield.add(vehicle.aeroshell,vehicle.backshell);
+        vehicle.aeroshell.visible=vehicle.backshell.visible=true;
         // Relative polar coordinates are subtracted in JS doubles before upload.
         const [r,theta]=shield.vector,angle=theta-s.polar[1];
         heatShield.position.set(r*Math.sin(angle),r*Math.cos(angle)-s.polar[0],0);

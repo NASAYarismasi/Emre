@@ -5,6 +5,7 @@ import { createPlanet, createSky } from './planet.js';
 import { label } from './primitives.js';
 import { interpolateState } from './interpolate.js';
 import { disposeScene } from './dispose.js';
+import { vehicleConfiguration } from './vehiclePhases.js';
 
 function line(points,color,dashed=false){const g=new THREE.BufferGeometry().setFromPoints(points);const m=dashed?new THREE.LineDashedMaterial({color,dashSize:2,gapSize:1,transparent:true,opacity:.6}):new THREE.LineBasicMaterial({color,transparent:true,opacity:.85});const l=new THREE.Line(g,m);if(dashed)l.computeLineDistances();return l;}
 
@@ -55,14 +56,28 @@ export function layoutMapLabels(items, width, height) {
   return { labels:placed, markers, width, height };
 }
 
-export function createMapScene(){let ctx,scene,sky,earth,mars,sun,marker,arrival,arrivalLabel,trajectory,prediction,earthLabel,marsLabel,shipLabel,mode,lastPath='';
+export function createMapScene(){let ctx,scene,sky,earth,mars,sun,marker,arrival,arrivalLabel,trajectory,prediction,earthLabel,marsLabel,shipLabel,shipLabels,transitIcon,landerIcon,mode,lastPath='';
   return {enter(context){ctx=context;scene=new THREE.Scene();this.scene=scene;scene.add(new THREE.AmbientLight(0xffffff,.6));const light=new THREE.DirectionalLight(0xffffff,3);light.position.set(0,200,0);scene.add(light);
     sky=createSky(ctx.assets);scene.add(sky.mesh);earth=createPlanet(1,false,ctx.assets);mars=createPlanet(1,true,ctx.assets);scene.add(earth.group,mars.group);
     sun=new THREE.Mesh(new THREE.SphereGeometry(4,32,24),new THREE.MeshBasicMaterial({color:new THREE.Color(5,3.2,1.2)}));scene.add(sun);
-    marker=new THREE.Mesh(new THREE.OctahedronGeometry(1.6),new THREE.MeshBasicMaterial({color:0xa2f5df}));scene.add(marker);
+    // GAME ASSUMPTION: enlarged symbolic silhouette, not map-distance scale.
+    marker=new THREE.Group();transitIcon=new THREE.Group();landerIcon=new THREE.Group();marker.add(transitIcon,landerIcon);scene.add(marker);
+    const white=new THREE.MeshBasicMaterial({color:0xdedfd7}),tan=new THREE.MeshBasicMaterial({color:0xb99752}),blue=new THREE.MeshBasicMaterial({color:0x6eabbc});
+    const iconPart=(parent,geometry,mat,x,z)=>{const mesh=new THREE.Mesh(geometry,mat);mesh.position.set(x,1,z);parent.add(mesh);return mesh;};
+    iconPart(transitIcon,new THREE.BoxGeometry(1.2,.5,5),white,0,1.6);
+    iconPart(transitIcon,new THREE.BoxGeometry(7,.15,1.8),blue,0,1.2);
+    iconPart(transitIcon,new THREE.ConeGeometry(.8,1.6,12),tan,0,-3.2).rotation.x=-Math.PI/2;
+    iconPart(transitIcon,new THREE.ConeGeometry(.8,1,12),tan,0,4.4).rotation.x=-Math.PI/2;
+    iconPart(landerIcon,new THREE.CylinderGeometry(1.35,1.5,.5,16),tan,0,-1.3);
     arrival=new THREE.Mesh(new THREE.TorusGeometry(3,.3,8,40),new THREE.MeshBasicMaterial({color:0xf0bd8a}));arrival.rotation.x=Math.PI/2;scene.add(arrival);arrivalLabel=label('MARS VARIŞI','#f0bd8a');arrivalLabel.scale.multiplyScalar(3);scene.add(arrivalLabel);
-    earthLabel=label('DÜNYA','#86c8eb');marsLabel=label('MARS','#edaf84');shipLabel=label('MÜRETTEBAT / 03','#9ce7d7',400);for(const l of [earthLabel,marsLabel,shipLabel])l.scale.multiplyScalar(3);scene.add(earthLabel,marsLabel,shipLabel);
+    earthLabel=label('DÜNYA','#86c8eb');marsLabel=label('MARS','#edaf84');
+    shipLabels={launch:label('SLS / ORION','#9ce7d7'),transit:label('MTV / ORION + ÖNCÜ','#9ce7d7'),lander:label('ÖNCÜ / İNİŞ ARACI','#9ce7d7')};
+    for(const l of [earthLabel,marsLabel,...Object.values(shipLabels)])l.scale.multiplyScalar(3);scene.add(earthLabel,marsLabel,...Object.values(shipLabels));
   },update(pair,alpha){const s=interpolateState(pair.previous,pair.current,alpha),solar=s.phase==='CRUISE'||s.phase==='MOI_BURN';const nextMode=solar?'solar':s.mars?'mars':'earth';const camera=ctx.cameras.camera;ctx.cameras.update(s,ctx.frameDelta);camera.position.set(0,solar?260:210,solar?340:250);camera.lookAt(0,0,0);camera.fov=46;camera.updateProjectionMatrix();
+    const config=vehicleConfiguration(s);
+    for(const sprite of Object.values(shipLabels))sprite.visible=false;
+    shipLabel=shipLabels[config.launch?'launch':config.docked?'transit':'lander'];
+    transitIcon.visible=!config.separated;landerIcon.visible=!config.launch;
     if(solar){
       const halfFov=Math.min(camera.fov*Math.PI/360,Math.atan(Math.tan(camera.fov*Math.PI/360)*camera.aspect));
       const radius=Math.hypot(...s.heliocentric.mars)/AU*MAP_SCALE+15;
