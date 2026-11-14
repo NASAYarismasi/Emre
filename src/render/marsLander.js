@@ -84,3 +84,27 @@ export function createMarsHeatShield() {
   rim.rotation.x = Math.PI/2; rim.position.y = .35; shield.add(rim);
   return shield;
 }
+
+/** GAME ASSUMPTION: 15 m entry envelope enclosing the folded surface vehicle.
+ * Same removable cover throughout rendezvous, cruise, orbit and entry.
+ * The open central docking collar allows crew transfer before separation.
+ * Concept context: https://ntrs.nasa.gov/citations/20120012928
+ */
+export function createMarsBackshell() {
+  const shell = new THREE.Group(); shell.name = 'mars-backshell';
+  const white = material(0xdedfd7,.75,.18), foil = material(0xb99752,.55,.45);
+  const profile = [[7.5,2.75],[7.5,3.8],[5,8.05],[3.5,10],[1.45,11.35]].map(([r,y])=>new THREE.Vector2(r,y));
+  const skin = new THREE.Mesh(new THREE.LatheGeometry(profile,48),white);
+  skin.castShadow=true; skin.receiveShadow=true; shell.add(skin);
+  cylinder(shell,1.5,1.5,.35,foil,[0,11.5,0]);
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(7.48,.09,8,48),foil);
+  rim.rotation.x=Math.PI/2; rim.position.y=2.75; shell.add(rim);
+  for(let i=0;i<12;i++) {
+    const angle=i*Math.PI/6;
+    const point=(r,y)=>[Math.cos(angle)*r,y,Math.sin(angle)*r];
+    beam(shell,point(7.51,3.8),point(5.01,8.05),.035,foil);
+    beam(shell,point(5.01,8.05),point(3.51,10),.035,foil);
+    beam(shell,point(3.51,10),point(1.46,11.32),.035,foil);
+  }
+  return shell;
+}

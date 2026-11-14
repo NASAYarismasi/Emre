@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { P0 } from '../sim/constants.js';
 import { seeded } from './primitives.js';
 import { landingSequence } from './landingSequence.js';
+import { NTR_NOZZLES } from './transitParts.js';
+import { vehicleConfiguration } from './vehiclePhases.js';
 
 function plume(color, hydrolox) {
   const uniforms={time:{value:0},power:{value:0},color:{value:new THREE.Color(color)},hydro:{value:hydrolox?1:0},pressure:{value:1}};
@@ -34,7 +36,8 @@ export function createEffects(scene) {
   function jet(type,pos) {const m=plume(type==='srb'?0xff9d3a:type==='retro'?0xffb778:0x637fff,type==='rs25'||type==='icps');m.position.fromArray(pos);rig.add(m);jets.push({type,m});}
   for(const x of [-6.4,6.4])jet('srb',[x,1,0]);
   for(let i=0;i<4;i++){const a=i*Math.PI/2+Math.PI/4;jet('rs25',[Math.cos(a)*2,0,Math.sin(a)*2]);}
-  jet('icps',[0,66,0]);jet('transit',[0,-3,0]);
+  jet('icps',[0,66,0]);
+  for(const position of NTR_NOZZLES)jet('transit',position);
   for(let i=0;i<4;i++){const a=i*Math.PI/2;jet('retro',[Math.cos(a)*4.2,1.5,Math.sin(a)*4.2]);}
   const engineLight=new THREE.PointLight(0xffad57,0,400,2);engineLight.position.set(0,-3,0);scene.add(engineLight);
   const max=2200,positions=new Float32Array(max*3),sizes=new Float32Array(max),colors=new Float32Array(max*4),particles=[],random=seeded(90);
@@ -100,6 +103,7 @@ export function createEffects(scene) {
     particles.push({p:[s.position[0]+x*c+y*sn,s.position[1]-x*sn+y*c,pos[2]],t:s.missionTime+(s.phase==='PRELAUNCH'?s.countdown.time:0),kind,seed:random(),vx:vx*c,vy:-vx*sn,vz:kind==='dust'?pos[2]/Math.max(1,Math.hypot(pos[0],pos[2]))*speed:(random()-.5)*8,theta:s.theta});
   }
   return {setQuality(v){quality=v;}, update(s,height=900){
+    const config=vehicleConfiguration(s);
     const clock=s.missionTime+(s.phase==='PRELAUNCH'?s.countdown.time:0)+(s.phase==='LANDED'?landingSequence.elapsed??0:0);
     const dt=lastTime===null?0:Math.max(0,clock-lastTime);lastTime=clock;
     rig.rotation.z=s.phase==='EDL'?(s.thrustAngle??0):s.attitude+s.theta;rig.position.set(0,['PRELAUNCH','ASCENT'].includes(s.phase)&&!s.stages.find(p=>p.id==='core').attached?-70:0,0).applyAxisAngle(new THREE.Vector3(0,0,1),rig.rotation.z);
@@ -108,12 +112,15 @@ export function createEffects(scene) {
     const pressure=Math.max(0,Math.min(1,s.pressure/P0)),expand=Math.min(4,Math.pow(P0/Math.max(10,s.pressure),.16));
     const pre=s.phase==='PRELAUNCH'?Math.min(1,(s.countdown.time+6.5)/5):1;
     for(const {type,m}of jets) {
-      const active=type==='srb'?solid:type==='rs25'?core:type==='icps'?s.phase==='ASCENT'&&!s.stages.find(p=>p.id==='core').attached&&s.engineFiring:type==='retro'?s.phase==='EDL'&&s.engineFiring:['TMI_BURN','MOI_BURN'].includes(s.phase);
+      const active=type==='srb'?solid:type==='rs25'?core:type==='icps'?s.phase==='ASCENT'&&!s.stages.find(p=>p.id==='core').attached&&s.engineFiring:type==='retro'?s.phase==='EDL'&&s.engineFiring:config.ntrBurn;
       m.visible=active;if(!active)continue;
       const power=type==='srb'?Math.min(1,(s.thrust??3e7)/3e7):Math.max(.08,(s.throttle??1)*pre);
-      const radius=type==='srb'?3.3:type==='rs25'?1.5:type==='retro'?1:2;
-      const length=type==='srb'?70:type==='rs25'?27:type==='retro'?15:30;
-      m.scale.set(radius*expand,length*(type==='retro'?.2+power*.8:.65+power*.35),radius*expand);m.material.uniforms.time.value=s.missionTime+(s.phase==='PRELAUNCH'?s.countdown.time:0);m.material.uniforms.power.value=power;m.material.uniforms.pressure.value=pressure;
+      const radius=type==='srb'?3.3:type==='rs25'?1.5:type==='retro'?1:type==='transit'?1.25:2;
+      const length=type==='srb'?70:type==='rs25'?27:type==='retro'?15:type==='transit'?14:30;
+      // GAME ASSUMPTION: a very faint blue visibility cue for hot hydrogen;
+      // NTR uses reactor heat, not combustion. No orange flame/Mach diamonds.
+      // https://www.nasa.gov/space-technology-mission-directorate/tdm/space-nuclear-propulsion/
+      m.scale.set(radius*expand,length*(type==='retro'?.2+power*.8:.65+power*.35),radius*expand);m.material.uniforms.time.value=s.missionTime+(s.phase==='PRELAUNCH'?s.countdown.time:0);m.material.uniforms.power.value=type==='transit'?power*.055:power;m.material.uniforms.pressure.value=pressure;
     }
     engineLight.position.y=s.mars?1.5:-3;
     engineLight.intensity=(solid?90000:core?45000:s.phase==='EDL'&&s.engineFiring?18000*s.throttle:0)*(.92+.08*Math.sin(s.missionTime*103));
