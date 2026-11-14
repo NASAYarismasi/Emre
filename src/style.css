@@ -1,0 +1,22 @@
+*{box-sizing:border-box}body{margin:0;background:#121b1d;color:#f3f5ee;font:16px system-ui,sans-serif}main{display:grid;grid-template-columns:minmax(0,1fr) 350px;min-height:100dvh}#scene{position:relative;min-height:540px;overflow:hidden}canvas{position:absolute;inset:0;display:block;touch-action:none}#label,small{position:absolute;left:22px;z-index:1;background:#172124e8;border:1px solid #ffffff35;padding:10px 13px;border-radius:5px;color:#ecf7ed;pointer-events:none}#label{top:22px;font:12px monospace;letter-spacing:.12em}small{bottom:22px}aside{background:#161e20;border-left:1px solid #ffffff22;display:flex;flex-direction:column;gap:22px;padding:30px 24px}h1{font-size:38px;line-height:1.02;letter-spacing:-.05em;margin:10px 0}p{font:12px monospace;letter-spacing:.13em;color:#d9f29f;margin:0 0 10px}.card{padding:17px;border:1px solid #ffffff26;border-radius:6px;background:#202c2d}strong{font-size:24px}#status,#objective{margin-top:9px;color:#c6d4cd;font-size:14px;line-height:1.5}footer{display:grid;gap:9px;margin-top:auto}button{font:600 14px system-ui;border:1px solid #ffffff33;border-radius:5px;padding:13px;background:#263638;color:#fff;cursor:pointer}button:first-child{background:#d9f29f;color:#17241a}button:disabled{opacity:.5;cursor:default}@media(max-width:690px){main{grid-template-columns:1fr}#scene{min-height:52dvh}aside{padding:19px;gap:15px}h1{font-size:31px}}
+
+#intro{position:absolute;inset:0;z-index:3;display:grid;place-items:center;background:#10191c66;padding:18px}
+#intro[hidden]{display:none}
+#intro>div{width:min(400px,100%);padding:24px 26px;background:#152126f5;border:1px solid #d9f29f55;border-radius:8px;box-shadow:0 16px 50px #0006}
+#intro h2{font-size:28px;margin:7px 0 14px}
+#intro p:nth-of-type(2){letter-spacing:0;line-height:1.55;color:#dfebdf;font:15px system-ui}
+#intro button{width:100%;margin-top:12px;background:#d9f29f;color:#17241a}
+#crosshair,#prompt{position:absolute;z-index:2;left:50%;transform:translateX(-50%);pointer-events:none;text-shadow:0 1px 5px #000}
+#crosshair{top:50%;transform:translate(-50%,-50%);font:22px monospace;color:#ecf9e2}
+#prompt{bottom:18%;border:1px solid #d9f29f60;background:#172124e8;border-radius:5px;padding:11px 15px;color:#edf7dc;max-width:90%;text-align:center}
+#prompt:empty{display:none}
+main:fullscreen{background:#161e20}
+canvas:focus{outline:none}
+
+#flight-controls{padding:15px;border:1px solid #ffffff28;border-radius:6px;background:#202c2d}
+.camera-buttons{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.camera-buttons button{background:#273536;color:#edf2e8;padding:8px 3px}
+.camera-buttons button[aria-pressed=true]{background:#d9f29f;color:#17241a}
+#telemetry{margin:12px 0;font:13px/1.5 monospace;color:#d7e7ee}
+#pause-btn{width:100%;padding:8px}
+#crosshair[hidden]{display:none}

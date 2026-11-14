@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="tr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Mars’a İlk Koloni</title></head>
+<body>
+<main>
+  <section id="scene" aria-label="Birinci şahıs görev sahnesi">
+    <span id="label">DÜNYA / FIRLATMA RAMPASI</span>
+    <span id="crosshair" aria-hidden="true">+</span>
+    <span id="prompt" aria-live="polite"></span>
+    <small>WASD Yürü · Fare / Oklar Bak · E Etkileş · Q Saat</small>
+    <div id="intro">
+      <div><p>FIRLATMA EKİBİ</p><h2>Rokete kalkış izni ver</h2><p>WASD ile rampadaki yeşil panele yürü. E ile kalkışı başlat.</p><button id="start-btn" disabled>Göreve gir</button></div>
+    </div>
+  </section>
+  <aside>
+    <header><p>GÖREV KONTROL</p><h1>Mars’a İlk Koloni</h1></header>
+    <div class="card"><p>MÜRETTEBAT</p><strong>3 astronot</strong><div id="status" role="status">NASA modelleri yükleniyor…</div></div>
+    <section id="flight-controls" hidden>
+      <p>KAMERALAR</p>
+      <div class="camera-buttons"><button data-view="outside" aria-pressed="true">1 Dış</button><button data-view="inside" aria-pressed="false">2 Kabin</button><button id="map-btn" data-view="map" aria-pressed="false">3 Rota</button></div>
+      <div id="telemetry"></div>
+      <button id="pause-btn">Uçuşu duraklat</button>
+    </section>
+    <div class="card" id="watch" hidden><p>KOL BİLGİSAYARI</p><strong id="mission-time">T+ 00:00</strong><div id="objective"></div></div>
+    <footer><button id="reset-btn" hidden>Görevi sıfırla</button><button id="watch-btn" aria-expanded="false" disabled>Kol bilgisayarını aç</button></footer>
+  </aside>
+</main>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

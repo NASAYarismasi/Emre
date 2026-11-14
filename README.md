@@ -46,3 +46,25 @@ Ortak alanları değiştirmeden önce üç kişi birlikte karar versin.
 - [NASA roket, kapsül ve astronot modellerini hazırla](https://github.com/NASAYarismasi/Emre/issues/1)
 - [3D kalkış ve Mars transfer sahnelerini geliştir](https://github.com/NASAYarismasi/Emre/issues/2)
 - [Mars inişini ve koloniye veri teslimini tamamla](https://github.com/NASAYarismasi/Emre/issues/3)
+
+## 3D kalkış prototipi
+
+```powershell
+npm ci
+npm run dev
+```
+
+Terminaldeki yerel adresi açıp **Göreve gir** seçeneğini seçin. **WASD** ile yürüyün, sahneye tıklayıp fareyle veya ok tuşlarıyla bakın. Yeşil kalkış paneline yaklaşınca **E** ile fırlatmayı başlatın. Kabinde kırmızı güç paneline yürüyüp **E** ile sistemi açın. **Q** kol bilgisayarını açar ve kapatır. **F** tam ekran, **Esc** fare kilidinden çıkış. Gömülü tarayıcıda fare kilidi çalışmazsa sürükleyerek veya oklarla bakabilirsiniz.
+
+
+SLS ve Orion, README’deki NASA STL kaynaklarından Blender’da sadeleştirilip GLB’ye çevrildi. NASA astronot GLB’si kendi Draco sıkıştırmasıyla yüklü. Bu önizleme için yaklaşık model ölçekleri ve animasyon profili kullanılıyor. Kol bilgisayarı şimdilik süre ve aktif adımı gösteriyor. Mars inişi ve fizik hesabı sonraki aşama.
+
+
+## Dünya–Mars uçuş modeli
+
+**1** dış kamera, **2** kabin kamerası, **3** Güneş merkezli rota, **P** zaman akışını duraklatır. Görev park yörüngesi, transfer, Mars yakalama, motorlu iniş ve yüzey teması aşamalarını içerir.
+
+- Transfer modeli dairesel ve eş düzlemli gezegen yörüngeleri varsayar. Kepler denklemiyle zaman boyunca konum, vis-viva ile Güneş’e göre hız hesaplanır. İlk açı yaklaşık 44,34°, süre 258,87 gündür. [NASA yörünge referansı](https://science.nasa.gov/learn/basics-of-space-flight/chapter4-1/)
+- İdeal darbeli manevralarda 200 km Dünya park yörüngesinden yaklaşık 3,61 km/s çıkış ve 250 km dairesel Mars yörüngesine yaklaşık 2,10 km/s yakalama deltası hesaplanır. Gerçek görev tarihleri, eğim, atmosfer, motor eylemleri ve yakıt lojistiği bu modelde çözülmez. Mars yakalama ile yüzey inişi arasında yörüngeden çıkış ayrı bir manevra olarak tasarlanacak.
+- Kalkış, egzoz, atmosfer geçişi ve motorlu inişin gösterimi şimdilik ölçekli mühendislik simülasyonu yerine temsili animasyon profilleriyle çalışır. Orion geometrisi varış sahnesinde konsept iniş aracının yerini tutuyor.
+- [Odyssey13](https://github.com/velluz-dev/Odyssey13) aynı yarışmadan 2D transfer örneği. Depoda yeniden kullanım lisansı görünmedi. [2025 3D Space Apps projesi](https://github.com/miguel-pramos/nasa-space-apps-2025) MIT lisanslı Godot koloni prototipi. [Orbiter](https://github.com/orbitersim/orbiter) MIT lisanslı C++ uçuş simülatörü. Bu PR’de bu projelerden kod alınmadı.
