@@ -40,6 +40,7 @@ export function createEnvironment(scene, camera, canvas) {
   let unixSeconds = EPOCH, warpIndex = 0, lastSol = 0, lastEmission = -Infinity, realTime = 0
   let solar = marsSun(unixSeconds), manualLamp = null, lampOn = false, storm = false, isFPS = false
   let latestLifeSupport = null // IHAN-SRC: read-only vendor plant telemetry
+  let latestRover = null // ROVER: full, read-only science telemetry.
   let latestState, activeTask = null, lastSnapshot = '', lastHUD = -Infinity
   const warps = [1,10,60]
   const abort = new AbortController()
@@ -214,12 +215,14 @@ export function createEnvironment(scene, camera, canvas) {
     // KOL contract: lmst is decimal Mars hours [0,24), elevation is degrees; state is unmodified İhan state.
     window.dispatchEvent(new CustomEvent('colony:state',{detail:{state:latestState,storm,activeTask,
       lifeSupport:latestLifeSupport, // IHAN-SRC: ARES / drawer integration
+      rover:latestRover, // ROVER: same shape as render_game_to_text().rover.
       lmst:solar.lmst/3600,headlamp:lampOn,sunElevationDeg:solar.elevation*DEG}}))
   }
   updateLighting(); alignHUD()
   return {
     get telemetry() { return {lmst:solar.lmst/3600,headlamp:lampOn,sunElevationDeg:solar.elevation*DEG,warp:warps[warpIndex],unixSeconds,storm,audio:audio.enabled} },
     setLifeSupport(value) { latestLifeSupport=value }, // IHAN-SRC
+    setRover(value) { latestRover=value }, // ROVER
     setFPS(value) { isFPS=value; audio.setActive(value); updateLighting(true) },
     step(running) { audio.step(running) },
     sync(state,task) {

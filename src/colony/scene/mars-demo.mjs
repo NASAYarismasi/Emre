@@ -13,6 +13,7 @@ import { createLifeSupportFacilities } from '../ihan/life-support.mjs'
 import { createEnvironment } from "./environment.mjs"
 import { createFootprints } from "./surface.mjs"
 import { createCrewAgents } from "./crew-npc.mjs"
+import { createRover } from './rover.mjs' // ROVER
 import { batchStaticModel, prepareSurfaceMaterials, batchStaticLeaves } from "./static-model.mjs"
 import { createMarsLander } from "../../render/marsLander.js"
 import { cargoOptions, defaultManifest, planMission, cargoLimitKg, transitDays } from "../mars-gorev-plani.mjs"
@@ -128,6 +129,15 @@ function makeScene() {
   reference.position.set(5.75, .02, 14.5)
   reference.rotation.y = -.6
   scene.add(objects, deposits, reference)
+  // ROVER: moving NASA model, shared facility computer, and an overview that follows commands.
+  const roverAgent = createRover({ scene, reference, heightAt: groundY, focus: (x, z) => {
+    if (fps.active) fps.setActive(false)
+    currentView = 'rover'; reference.visible = true
+    camera.position.set(x + 9, groundY(x, z) + 6.5, z + 11)
+    controls.target.set(x, groundY(x, z) + 1, z); controls.update()
+  } })
+  lifeSupport.consoles.registerRover(roverAgent) // ROVER
+  environment.setRover(roverAgent.telemetry) // ROVER
   const crewModels = new Map()
   const loadedCharacters = new Set()
   const retiredCharacters = []
@@ -186,6 +196,7 @@ function makeScene() {
     if (roofAccess) return true
     if (navigation.collides(x,z)) return true
     if (occupied(x, z, .31)) return true
+    if (reference.visible && reference.children.length && Math.hypot(x - reference.position.x, z - reference.position.z) < 1.85) return true // ROVER: moving hull clearance.
     // Metre-scale hull radius 5.8 + suited shoulder clearance. Keep the camera
     // outside the belly/engine envelope while allowing the +Z ladder approach.
     if (Math.hypot(x - crewLander.position.x, z - crewLander.position.z) < 6.18) return true
@@ -440,6 +451,13 @@ function makeScene() {
   }
   function tick(delta, updateAim = true) {
     environment.update(delta)
+    // ROVER: preserve orbit controls while following actual simulated rover displacement.
+    const roverX = reference.position.x, roverY = reference.position.y, roverZ = reference.position.z
+    roverAgent.update(delta, environment.telemetry.warp)
+    if (currentView === 'rover') {
+      camera.position.x += reference.position.x - roverX; camera.position.y += reference.position.y - roverY; camera.position.z += reference.position.z - roverZ
+      controls.target.x += reference.position.x - roverX; controls.target.y += reference.position.y - roverY; controls.target.z += reference.position.z - roverZ
+    }
     // IHAN-SRC: drive vendor calculations from the same Mars clock, including warp.
     lifeSupport.update(delta, environment.telemetry, camera, fps)
     environment.setLifeSupport(lifeSupport.telemetry)
@@ -463,6 +481,7 @@ function makeScene() {
     fps: fps.active, player: fps.telemetry, environment: environment.telemetry,
     lifeSupport: lifeSupport.telemetry, // IHAN-SRC: deterministic observer contract
     crewAgents: crewAgents.telemetry,
+    rover: roverAgent.telemetry, // ROVER: full SI science/sample contract for dashboard.
     placement: { selected: selected ?? null, preview: preview.visible, marker: marker.visible },
     rendering: { ...frameStats, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, pixelRatio: renderer.getPixelRatio() },
   })
@@ -491,7 +510,7 @@ function makeScene() {
     for (const node of surfaceDeposits) depositMeshes.get(node.id).visible = workshop.collected[node.id] !== state.sol
     roofs.clear()
     groundObstacles.length = 0
-    for (const asset of hardware.filter(asset => asset !== crewLander && asset.visible)) groundObstacles.push({ x: asset.position.x, z: asset.position.z,
+    for (const asset of hardware.filter(asset => asset !== crewLander && asset !== reference && asset.visible)) groundObstacles.push({ x: asset.position.x, z: asset.position.z, // ROVER: hull collision reads its live position above.
       halfX: asset.userData.radius, halfZ: asset.userData.radius })
     const moduleLights = []
     for (const item of state.placed) {
@@ -603,7 +622,7 @@ function makeScene() {
 
   return {
     redraw: redrawScene,
-    resetEnvironment() { environment.reset(); lifeSupport.reset(state) }, // IHAN-SRC
+    resetEnvironment() { environment.reset(); lifeSupport.reset(state); roverAgent.reset() }, // IHAN-SRC // ROVER
     loadNASA,
     dispose() {
       if (disposed) return
@@ -611,6 +630,7 @@ function makeScene() {
       renderer.setAnimationLoop(null)
       if (gpuFence) gl.deleteSync(gpuFence)
       observer.disconnect(); crewAgents.dispose(); lifeSupport.dispose(); fps.dispose(); ova.dispose(); // IHAN-SRC
+      roverAgent.dispose() // ROVER
        environment.dispose(); tracks.dispose(); controls.dispose()
       window.render_game_to_text = previousTextHook; window.advanceTime = previousAdvanceHook
       const geometries = new Set(), materials = new Set(), textures = new Set()
@@ -685,6 +705,7 @@ function makeScene() {
         rover.add(fitCharacter(prepareOvaRover(gltf.scene), 2.18))
         reference.position.y = groundY(reference.position.x, reference.position.z)
         reference.add(rover)
+        roverAgent.bindModel(rover) // ROVER: preserve and animate the real mast hierarchy.
         reference.userData.radius = 1.55
         hardware.push(reference)
         redrawScene()
