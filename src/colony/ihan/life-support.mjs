@@ -3,7 +3,8 @@ import * as T from 'three';
 import { createAirSystem } from './hava.mjs';
 import { createWaterSystem } from './su.mjs';
 import { createGreenhouse } from './sera.mjs';
-import { createLifeSupport, stepLifeSupport, syncLifeSupport, lifeSupportTelemetry } from '../../sim/colonyLifeSupport.js';
+import { createLifeSupport, stepLifeSupport, syncLifeSupport, lifeSupportTelemetry, setLifeControl, greenhouseLightsOn } from '../../sim/colonyLifeSupport.js';
+import { createSystemConsoles } from '../scene/system-consoles.mjs';
 import { findAnimatedObjects, batchStaticLeaves } from '../scene/static-model.mjs';
 
 export function createLifeSupportFacilities(scene, heightAt, initialState) {
@@ -22,6 +23,23 @@ export function createLifeSupportFacilities(scene, heightAt, initialState) {
   air.update({ producer: false }); water.update({ extractor: false });
   const batched = [batchStaticLeaves(greenhouse.group, keepGreenhouse), batchStaticLeaves(air.group, keepAir), batchStaticLeaves(water.group, keepWater)];
   let support = createLifeSupport(initialState), colony = initialState;
+  let airlockState = 'idle', sunElevation = 30;
+  // Facility computers + effects. Emitters sit on the parts İhan's API actually moves (fan rotors, drill).
+  const worldOf = set => [...set].map(o => o.getWorldPosition(new T.Vector3()));
+  const airVents = worldOf(keepAir).filter(p => p.y > origin.y + 1.5);
+  const drill = worldOf(keepWater)[0] ?? new T.Vector3(64, heightAt(64, -26), -26);
+  const beds = []; for (let row = 0; row < 3; row++) for (let col = 0; col < 2; col++)
+    beds.push(new T.Vector3(origin.x + 1.85 + col * 1.65, origin.y + 1.35, origin.z - 3.8 + row * 3.35));
+  const consoles = createSystemConsoles({ scene, heightAt,
+    placements: { air: { x: 23.4, z: 9.4 }, water: { x: 60.4, z: -21.6 }, greenhouse: { x: 30.4, z: -1.4 } },
+    emitters: { airVents: airVents.length ? airVents : [new T.Vector3(19, origin.y + 2.8, 6)], drill: new T.Vector3(drill.x, heightAt(drill.x, drill.z), drill.z), beds },
+    getTelemetry: () => ({ ...lifeSupportTelemetry(support), airlock: airlockState }),
+    setControl: (system, key, value) => { support = setLifeControl(support, system, key, value); applyVisuals(); draw(); } });
+  function applyVisuals() {
+    // Visuals follow the simulated units: fans spin only when producing, drill only when extracting.
+    const ledOn = support.greenhouse?.ledOn ?? greenhouseLightsOn(support.controls, sunElevation);
+    greenhouse.setNight(ledOn);
+  }
   let inside = false, cycle = null, time = 0, lastClock = null, lastDraw = -1;
   const direction = new T.Vector3();
   const local = camera => ({ x: camera.position.x - origin.x, z: camera.position.z - origin.z });
@@ -45,10 +63,12 @@ export function createLifeSupportFacilities(scene, heightAt, initialState) {
   return {
     get inside() { return inside || Boolean(cycle); },
     get floorY() { return origin.y + .25; },
-    get telemetry() { return { ...lifeSupportTelemetry(support), greenhouse: { inside, airlock: cycle ? cycle.awaiting ? 'awaiting-door' : 'cycling' : 'idle', night: this.night } }; },
+    get telemetry() { const t = lifeSupportTelemetry(support); return { ...t, greenhouse: { ...t.greenhouse, inside, airlock: cycle ? cycle.awaiting ? 'awaiting-door' : 'cycling' : 'idle', night: this.night }, console: consoles.open }; },
+    consoles,
     night: false,
-    prompt,
+    prompt: camera => prompt(camera) || consoles.prompt(camera),
     interact(camera, fps) {
+      if (!cycle && !inside && consoles.interact(camera)) return true;
       if (cycle) {
         if (cycle.awaiting && facing(camera, cycle.exiting)) { cycle.awaiting = false; cycle.released = true; cycle.elapsed = 4.2; }
         return true;
@@ -70,7 +90,7 @@ export function createLifeSupportFacilities(scene, heightAt, initialState) {
           if(Math.abs(px-(1.85+col*1.65))<.95 && Math.abs(pz-(-3.8+row*3.35))<1.45)return true;
         return false;
       }
-      return this.blocksFootprint(x,z,.3,.3);
+      return this.blocksFootprint(x,z,.3,.3) || consoles.blocks(x,z);
     },
     blocksFootprint(x,z,hx,hz) {
       return (Math.abs(x-origin.x)<5.5+hx && z+hz>origin.z-6.4 && z-hz<origin.z+6.4)
@@ -81,10 +101,13 @@ export function createLifeSupportFacilities(scene, heightAt, initialState) {
     update(dt, environment, camera, fps) {
       time += dt;
       const clock = environment.unixSeconds;
-      if (lastClock !== null && clock >= lastClock) support = stepLifeSupport(support, clock-lastClock);
+      sunElevation = environment.sunElevationDeg;
+      if (lastClock !== null && clock >= lastClock) support = stepLifeSupport(support, clock-lastClock, sunElevation);
       lastClock = clock;
-      const night = environment.sunElevationDeg < 0;
-      if (night !== this.night) { this.night = night; greenhouse.setNight(night); }
+      this.night = sunElevation < 0;
+      const ledOn = Boolean(support.greenhouse?.ledOn);
+      if (ledOn !== this.ledOn) { this.ledOn = ledOn; greenhouse.setNight(ledOn); }
+      airlockState = cycle ? cycle.awaiting ? 'awaiting-door' : 'cycling' : 'idle';
       if (cycle) {
         cycle.elapsed += dt;
         if (cycle.elapsed >= 1.2) greenhouse.setAirlock(false,false,true);
@@ -102,6 +125,7 @@ export function createLifeSupportFacilities(scene, heightAt, initialState) {
       }
       air.update(support.air); water.update(support.water);
       air.frame(time,dt); water.frame(time,dt); greenhouse.frame(time);
+      consoles.update(dt);
       if (time-lastDraw>.25) { draw(); lastDraw=time; }
     },
     reset(next) { support=createLifeSupport(next); colony=next; inside=false; cycle=null; lastClock=null; greenhouse.setAirlock(false,false); draw(); },
@@ -110,6 +134,6 @@ export function createLifeSupportFacilities(scene, heightAt, initialState) {
       air: { position:[25,5.5,17], target:[19,1.6,6] },
       water: { position:[55,6.1,-15], target:[62,1.65,-26] },
     },
-    dispose() { greenhouse.dispose(); air.dispose(); water.dispose(); for (const m of [greenhouse,air,water]) m.group.removeFromParent(); },
+    dispose() { consoles.dispose(); greenhouse.dispose(); air.dispose(); water.dispose(); for (const m of [greenhouse,air,water]) m.group.removeFromParent(); },
   };
 }
