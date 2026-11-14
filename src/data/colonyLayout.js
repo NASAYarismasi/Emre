@@ -5,7 +5,11 @@
 export const LANDER_PAD = Object.freeze({ x: -16, z: -91, radius: 14 })
 export const COMMS_PAD = Object.freeze({ x: -38, z: -27, radius: 7 })
 export const LANDER_SPAWN = Object.freeze({ x: LANDER_PAD.x, z: LANDER_PAD.z + 9 })
-export const ARRIVAL_YAW = Math.atan2(LANDER_SPAWN.x, LANDER_SPAWN.z)
+// Team lead: after landing the walk starts at the colony, not 80 m away at the lander.
+// GAME ASSUMPTION: the crew has already crossed the flagged route (ARRIVAL_ROUTE) to the habitat apron.
+export const COLONY_SPAWN = Object.freeze({ x: -8, z: 19 })
+// Face the central dome; the lander pad stays visible behind-left when the player turns around.
+export const ARRIVAL_YAW = Math.atan2(COLONY_SPAWN.x, COLONY_SPAWN.z)
 export const ROVER_PARK = Object.freeze({ x: 5.75, z: 14.5 })
 // Conservative circles for the fixed buildings and array footprint.
 export const FACILITY_KEEPOUTS = [

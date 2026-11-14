@@ -17,7 +17,7 @@ import { createCrewAgents } from "./crew-npc.mjs"
 import { createRover } from './rover.mjs' // ROVER
 import { batchStaticModel, prepareSurfaceMaterials, batchStaticLeaves } from "./static-model.mjs"
 import { createMarsLander } from "../../render/marsLander.js"
-import { LANDER_PAD, LANDER_SPAWN, ARRIVAL_YAW, ROVER_PARK } from '../../data/colonyLayout.js'
+import { LANDER_PAD, LANDER_SPAWN, COLONY_SPAWN, ARRIVAL_YAW, ROVER_PARK } from '../../data/colonyLayout.js'
 import { createLandingZone } from './landing-zone.mjs'
 import { cargoOptions, defaultManifest, planMission, cargoLimitKg, transitDays } from "../mars-gorev-plani.mjs"
 import { createSceneColony } from "./mission-start.mjs"
@@ -408,7 +408,7 @@ function makeScene() {
     },
   })
   // Crew arrives beside the +Z hatch ladder; avoid respawning inside the landing legs.
-  const hatchSpawn = new T.Vector3(LANDER_SPAWN.x, 0, LANDER_SPAWN.z) // +Z ladder, clear of the diagonal legs
+  const hatchSpawn = new T.Vector3(COLONY_SPAWN.x, 0, COLONY_SPAWN.z) // habitat apron (lander ladder: LANDER_SPAWN)
   // Face İhan's dome complex (centred on the origin); camera forward is (-sin yaw, -cos yaw).
   const arrivalYaw = ARRIVAL_YAW
   crewActor(playerId).position.set(hatchSpawn.x, groundY(hatchSpawn.x, hatchSpawn.z), hatchSpawn.z)
@@ -497,7 +497,7 @@ function makeScene() {
     habitat: habitatRooms.telemetry, // SAMET-HAB: expose actual screen data for browser verification.
     crewAgents: crewAgents.telemetry,
     rover: roverAgent.telemetry, // ROVER: full SI science/sample contract for dashboard.
-    layout: { lander: { ...LANDER_PAD, y: crewLander.position.y }, hatchSpawn: LANDER_SPAWN, arrivalYaw,
+    layout: { lander: { ...LANDER_PAD, y: crewLander.position.y }, hatchSpawn: COLONY_SPAWN, landerLadder: LANDER_SPAWN, arrivalYaw,
       comms: ova.comms.telemetry, roverPark: ROVER_PARK },
     placement: { selected: selected ?? null, preview: preview.visible, marker: marker.visible },
     rendering: { ...frameStats, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, pixelRatio: renderer.getPixelRatio() },

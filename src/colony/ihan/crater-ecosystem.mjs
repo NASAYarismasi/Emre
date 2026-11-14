@@ -568,9 +568,13 @@ export function createOvaWorld(scene){
     material.onBeforeCompile=shader=>{
       shader.vertexShader="varying vec3 habitatPosition;\n"+shader.vertexShader
       shader.vertexShader=shader.vertexShader.replace("#include <begin_vertex>","#include <begin_vertex>\nhabitatPosition=position;")
-      const ports=["(habitatPosition.z > 2.15 && abs(habitatPosition.x) < .82 && habitatPosition.y < 2.19)"]
-      if(index>0) ports.push("(habitatPosition.x < -2.4 && abs(habitatPosition.z) < .94 && habitatPosition.y < 2.44)")
-      if(index<2) ports.push("(habitatPosition.x > 2.4 && abs(habitatPosition.z) < .94 && habitatPosition.y < 2.44)")
+      // Samet (4c88580): one airlock door (centre dome only), round tunnel mouths matching the 1.25 m
+      // connector bore (no corner gaps), and a rear opening in the right dome to the hygiene module.
+      const n = index===1 ? 1.28 : .94
+      const ports = index===1 ? [`(habitatPosition.z > 2.15 && abs(habitatPosition.x) < .79 && habitatPosition.y*${n} < 2.06)`] : []
+      if(index===2) ports.push(`(habitatPosition.z < -2.4 && abs(habitatPosition.x)<.72 && habitatPosition.y*${n}<2.2)`)
+      if(index>0) ports.push(`(habitatPosition.x < -2.4 && habitatPosition.z*habitatPosition.z + pow(habitatPosition.y*${n}-1.19,2.0) < 1.25*1.25)`)
+      if(index<2) ports.push(`(habitatPosition.x > 2.4 && habitatPosition.z*habitatPosition.z + pow(habitatPosition.y*${n}-1.19,2.0) < 1.25*1.25)`)
       ports.push("(habitatPosition.z > 2.3 && length((habitatPosition.xy-vec2(-1.24,1.56))/vec2(.29,.29))<1.0)")
       ports.push("(habitatPosition.z > 2.3 && length((habitatPosition.xy-vec2(1.24,1.56))/vec2(.29,.29))<1.0)")
       shader.fragmentShader="varying vec3 habitatPosition;\n"+shader.fragmentShader
@@ -663,6 +667,12 @@ export function createOvaWorld(scene){
       mesh(group,new T.CylinderGeometry(.025,.038,1.58,12),steel,-.5,5.08,-.18)
       mesh(group,new T.CylinderGeometry(.05,.064,.81,12),steel,.42,4.7,-.35)
     }
+    // Samet: only the centre dome has the airlock chamber, hatches and ramp (single entrance).
+    if(index!==1){
+      group.traverse(part=>{if(part.isMesh && part.material!==glazing){part.castShadow=true;part.receiveShadow=true}})
+      colonyGroup.add(group)
+      continue
+    }
     const chamber = new T.Group()
     group.add(chamber)
     block(chamber,1.94,.16,2.28,deckMat,0,-.08,4.01)
@@ -728,6 +738,21 @@ export function createOvaWorld(scene){
     colonyGroup.add(group)
   }
   const tunnelMaterial=new T.MeshStandardMaterial({color:0xa5a59c,roughness:.66,metalness:.26,side:T.DoubleSide})
+  // Samet: trim the connector tube where it pokes inside a dome shell, so no tube walls show indoors.
+  tunnelMaterial.onBeforeCompile=shader=>{
+    shader.vertexShader="varying vec3 connectorWorld;\n"+shader.vertexShader.replace("#include <begin_vertex>","#include <begin_vertex>\nconnectorWorld=(modelMatrix*vec4(position,1.0)).xyz;")
+    const trims=centers.map((cx,index)=>{
+      const sh=index===1?1.28:.94
+      let code=`{float h=(connectorWorld.y-${floorY.toFixed(8)})/${sh};float r=0.0;`
+      for(let i=0;i<rings.length-1;i++){
+        const [r0,y0]=rings[i],[r1,y1]=rings[i+1]
+        code+=`if(h>=${y0.toFixed(6)}&&h<${y1.toFixed(6)})r=mix(${r0.toFixed(6)},${r1.toFixed(6)},(h-${y0.toFixed(6)})/${(y1-y0).toFixed(6)});`
+      }
+      return code+`if(length(connectorWorld.xz-vec2(${cx.toFixed(1)},0.0))<r-0.025)discard;}`
+    }).join("\n")
+    shader.fragmentShader="varying vec3 connectorWorld;\n"+shader.fragmentShader.replace("#include <clipping_planes_fragment>","#include <clipping_planes_fragment>\n"+trims)
+  }
+  tunnelMaterial.customProgramCacheKey=()=>"connector-boundary-trim-v1"
   for(const x of [-4.5,4.5]){
     const tube=mesh(colonyGroup,new T.CylinderGeometry(1.27,1.27,4.05,32,1,true),tunnelMaterial,x,floorY+1.19,0)
     tube.rotation.z=Math.PI/2
@@ -737,10 +762,19 @@ export function createOvaWorld(scene){
       mesh(colonyGroup,new T.TorusGeometry(1.275,.044,8,32),steel,x+dx,floorY+1.19,0).rotation.y=Math.PI/2
     }
   }
-  const insideZone=(x,z)=>centers.some(cx=>Math.hypot(x-cx,z)<radius-.33)
+  // Samet: strip curtain at the left connector mouth (laboratory side).
+  const stripMat=new T.MeshPhysicalMaterial({color:0x9bbcc0,transparent:true,opacity:.27,roughness:.32,side:T.DoubleSide,depthWrite:false})
+  block(colonyGroup,.09,.08,1.45,steel,-5.9,floorY+2.22,0)
+  for(let i=0;i<9;i++){
+    const strip=mesh(colonyGroup,new T.PlaneGeometry(.16,2.03),stripMat,-5.9,floorY+1.17,-.64+i*.16)
+    strip.rotation.y=Math.PI/2; strip.rotation.x=(i%2?1:-1)*.025
+  }
+  const insideZone=(x,z)=>(Math.abs(x-9)<1.12 && z<-2.45 && z>-6.7) // Samet hygiene module
+    || centers.some(cx=>Math.hypot(x-cx,z)<radius-.33)
     || (Math.abs(z)<.73 && Math.abs(x)<9)
   const outsideObstacle=(x,z)=> (Math.abs(x-greenhouseSite.x)<5.55 && z>greenhouseSite.z-6.6 && z<greenhouseSite.z+6.6)
     || (Math.abs(x-greenhouseSite.x)<1.55 && z>=greenhouseSite.z+6.6 && z<greenhouseSite.z+9.05)
+    || (Math.abs(x-9)<1.65 && z<-2.5 && z>-7.2) // Samet hygiene module footprint
     || centers.some(cx=>Math.hypot(x-cx,z)<radius+.25)
     || (Math.abs(z)<1.46 && Math.abs(x)<9)
     || locks.some(lock=>Math.abs(x-lock.x)<1.14 && z>2.85 && z<5.34)

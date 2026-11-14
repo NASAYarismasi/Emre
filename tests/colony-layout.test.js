@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LANDER_PAD, COMMS_PAD, LANDER_SPAWN, ARRIVAL_YAW, FACILITY_KEEPOUTS,
+import { LANDER_PAD, COMMS_PAD, LANDER_SPAWN, COLONY_SPAWN, ARRIVAL_YAW, FACILITY_KEEPOUTS,
   PAD_KEEPOUTS, beaconOnAt } from '../src/data/colonyLayout.js'
 import { ROVER_HOME, ROVER_OBSTACLES, ROVER_STATIONS, planRoverPath, roverSegmentClear } from '../src/sim/rover.js'
 import { CREW_SITES, CREW_OBSTACLES, planPath } from '../src/colony/scene/crew-npc.mjs'
@@ -27,9 +27,10 @@ describe('shared surface layout', () => {
   })
   it('spawns outside hull/feet at the +Z ladder and looks directly toward the habitat', () => {
     expect(LANDER_SPAWN).toEqual({x:LANDER_PAD.x,z:LANDER_PAD.z+9})
-    const distance=Math.hypot(LANDER_SPAWN.x,LANDER_SPAWN.z)
-    expect(-Math.sin(ARRIVAL_YAW)).toBeCloseTo(-LANDER_SPAWN.x/distance)
-    expect(-Math.cos(ARRIVAL_YAW)).toBeCloseTo(-LANDER_SPAWN.z/distance)
+    const distance=Math.hypot(COLONY_SPAWN.x,COLONY_SPAWN.z)
+    expect(-Math.sin(ARRIVAL_YAW)).toBeCloseTo(-COLONY_SPAWN.x/distance)
+    expect(-Math.cos(ARRIVAL_YAW)).toBeCloseTo(-COLONY_SPAWN.z/distance)
+    expect(distance).toBeLessThan(25) // start at the colony
     for (const sx of [-1,1]) for (const sz of [-1,1])
       expect(Math.hypot(LANDER_SPAWN.x-LANDER_PAD.x-sx*8.5/Math.sqrt(2),LANDER_SPAWN.z-LANDER_PAD.z-sz*8.5/Math.sqrt(2))).toBeGreaterThan(1.48)
   })

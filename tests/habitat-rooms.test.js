@@ -32,6 +32,8 @@ describe('Samet habitat in the current İhan domes', () => {
       const positions = part.geometry.getAttribute('position');
       for (let i=0;i<positions.count;i++) {
         point.fromBufferAttribute(positions,i).applyMatrix4(part.matrixWorld);
+        // Samet's hygiene module: shell walls and support legs sit on/outside the walkable floor by design.
+        if (Math.abs(point.x-9)<1.45 && point.z<-2.9 && point.z>-7.05) continue;
         expect(world.isInsideFloor(point.x,point.z), `${part.name}: ${point.x}, ${point.z}`).toBe(true);
         expect(point.y).toBeGreaterThanOrEqual(world.floorY-1e-6);
       }
@@ -48,8 +50,9 @@ describe('Samet habitat in the current İhan domes', () => {
     expect(entry).toMatchObject({x:0,z:2.45,y:world.floorY});
     // Actual navigation.collides, sampled every 2 cm; no teleport between route segments.
     let from = [entry.x,entry.z];
-    const route = [[0,0],[0,-.9],[0,0],[-4.5,0],[-9,0],[-9,-.85],[-9,0],[0,0],[4.5,0],[9,0],[9,.15],[9,0],[9,-1.6],[9,0],[0,0],[0,2.45]];
+    const route = [[0,0],[0,-.9],[0,0],[-4.5,0],[-9,0],[-9,-.85],[-9,0],[0,0],[4.5,0],[9,0],[9,.15],[9,0],[9,-2.6],'door',[9,-4.4],[9,0],[0,0],[0,2.45]];
     for (const to of route) {
+      if (to === 'door') { expect(rooms.interact(...from)).toBe(true); continue; } // open Samet's privacy door
       const steps = Math.ceil(Math.hypot(to[0]-from[0],to[1]-from[1])/.02);
       for(let i=0;i<=steps;i++) {
         const x=from[0]+(to[0]-from[0])*i/steps, z=from[1]+(to[1]-from[1])*i/steps;
@@ -62,23 +65,25 @@ describe('Samet habitat in the current İhan domes', () => {
 
   it('blocks console, bunks, lab bench and hygiene equipment with a body clearance', () => {
     navigation.reset(); navigation.interact(0,world.entryZ);
-    for (const point of [[0,-2.1],[9,1.5],[-9,-1.98],[9.29,-2.34]]) expect(navigation.collides(...point)).toBe(true);
+    for (const point of [[0,-2.1],[9,1.5],[-9,-1.98],[9.65,-6.0]]) expect(navigation.collides(...point)).toBe(true);
     const console = world.indoorObstacles[0];
     expect(navigation.collides(console.max.x+HABITAT_CLEARANCE-.01,-2.1)).toBe(true);
     expect(navigation.collides(console.max.x+HABITAT_CLEARANCE+.01,-2.1)).toBe(false);
   });
 
-  it('keeps an operable privacy curtain and collision gate after host batching', () => {
+  it('keeps Samet’s operable privacy door and collision gate after host batching', () => {
     const keep = new Set(world.locks.flatMap(lock=>[lock.inner,lock.outer])); keep.add(rooms.root);
     batchStaticLeaves(world.habitat,keep);
     expect(rooms.batching.after).toBeLessThan(rooms.batching.before/3);
     const lights=[]; rooms.root.traverse(o=>{if(o.isLight)lights.push(o);}); expect(lights).toHaveLength(0);
-    expect(rooms.interact(9,-1.6)).toBe(true);
-    expect(navigation.collides(9,-1.08)).toBe(true);
+    // Bring the door to a known state, then toggle it from the dome side.
+    if (!rooms.telemetry.privacyClosed) expect(rooms.interact(9,-2.6)).toBe(true);
     expect(rooms.telemetry.privacyClosed).toBe(true);
-    expect(rooms.interact(9,-1.6)).toBe(true);
-    expect(navigation.collides(9,-1.08)).toBe(false);
-    expect(rooms.interact(9,-1.08)).toBe(false); // no closing through the body
+    expect(navigation.collides(9,-3.07)).toBe(true);
+    expect(rooms.interact(9,-2.6)).toBe(true);
+    expect(rooms.telemetry.privacyClosed).toBe(false);
+    expect(navigation.collides(9,-3.07)).toBe(false);
+    expect(rooms.interact(9,-3.07)).toBe(false); // no closing through the body
   });
 });
 

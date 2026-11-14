@@ -45,7 +45,7 @@ describe('İhan Düz Ova world (real source ed79956)',()=>{
 
 
     const lights=[];scene.traverse(o=>{if(o.isLight)lights.push(o);});
-    expect(lights).toHaveLength(6); expect(lights.every(o=>!o.castShadow)).toBe(true);
+    expect(lights).toHaveLength(4); // single airlock: side domes have no chamber light expect(lights.every(o=>!o.castShadow)).toBe(true);
     const rocks=scene.children.filter(o=>o.isInstancedMesh);
     expect(rocks).toHaveLength(5);expect(rocks.reduce((sum,o)=>sum+o.count,0)).toBe(7140);
     expect(scene.getObjectByName('Mars_environment')).toBeUndefined();

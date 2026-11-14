@@ -4,7 +4,7 @@
  * Only his console/two displays, three bunks, lab bench/tubes/analyser and
  * controlRoom/bedroom/laboratory/sanitary views are adapted here. The bundled
  * older world, shell, external bathroom extension and navigation are NOT imported.
- * Host rebuild: in-dome WHC, glovebox, curtains, collision footprints, live rover
+ * Host rebuild: Samet's separate hygiene module behind the right dome, glovebox, curtains, collision footprints, live rover
  * science, batched geometry and resource ownership. All dimensions: GAME ASSUMPTION.
  * WHC design reference (airflow collection, separate hose and waste container):
  * https://www.nasa.gov/general/morning-routine-in-space/
@@ -25,8 +25,8 @@ export function habitatLayout(floorY) {
       position: [7.1, floorY + 1.85, -.45], target: [9.3, floorY + .63, 1.55] },
     laboratory: { name: ROOM_NAMES.laboratory, domeX: -9, waypoint: [-9, 0, -.85],
       position: [-9, floorY + 1.7, 1.9], target: [-9, floorY + 1.23, -1.95] },
-    sanitary: { name: ROOM_NAMES.sanitary, domeX: 9, waypoint: [9, 0, -1.6],
-      position: [9, floorY + 1.65, -.45], target: [9.1, floorY + .85, -2.12] },
+    sanitary: { name: ROOM_NAMES.sanitary, domeX: 9, waypoint: [9, 0, -4.4],
+    position: [9, floorY + 1.65, -3.5], target: [9.2, floorY + .8, -6.4] },
   };
 }
 
@@ -184,59 +184,65 @@ export function createHabitatRooms(world) {
   }
   box(.8, .045, .14, dark, -9.25, 1.01, -1.68);
 
-  // In-dome Waste & Hygiene Compartment. Side panels leave a 1.04 m entry.
-  for (const x of [8.22, 9.78]) {
-    box(.08, 1.95, 1.64, ivory, x, .975, -1.92);
-    obstacle(x, -1.92, .08, 1.64);
+  // Samet's Waste & Hygiene module (NASAYarismasi/Samet 4c88580): a separate pressurised compartment
+  // behind the right dome (x 9, z -3…-7), entered through the dome's rear opening and a privacy door.
+  // Layout as in his build: vacuum toilet, hand-wash unit, shower stall with screen; legs on the regolith.
+  const heightAt = world.ground?.userData?.heightAt ?? (() => world.floorY - .5);
+  const M = new T.Group(); M.name = 'SanitaryRoom'; M.position.set(9, 0, 0); root.add(M);
+  const deck = material({ color: 0x76634e, roughness: .82 });
+  box(2.7, .16, 4, deck, 0, -.08, -5, M);                 // floor
+  box(2.7, .14, 4, ivory, 0, 2.5, -5, M);                 // ceiling
+  for (const x of [-1.3, 1.3]) box(.14, 2.5, 4, ivory, x, 1.25, -5, M);
+  box(2.7, 2.5, .14, ivory, 0, 1.25, -6.93, M);           // back wall
+  for (const x of [-1.05, 1.05]) box(.5, 2.5, .14, ivory, x, 1.25, -3.07, M);
+  box(1.6, .22, .14, ivory, 0, 2.39, -3.07, M);           // lintel over the doorway
+  for (const dx of [-1.08, 1.08]) for (const z of [-3.35, -5, -6.65]) {   // support legs to the ground
+    const ground = heightAt(9 + dx, z) - world.floorY, h = Math.max(.08, -.16 - ground);
+    box(.14, h, .14, steel, dx, ground + h / 2, z, M);
+    box(.45, .08, .45, deck, dx, ground + .02, z, M);
   }
-  box(1.64, 1.95, .08, ivory, 9, .975, -2.74);
-  obstacle(9, -2.74, 1.64, .08);
-  box(1.64, .09, 1.65, ivory, 9, 1.995, -1.92);
-  for (const x of [8.37, 9.63]) {
-    box(.26, 1.95, .07, steel, x, .975, -1.08);
-    obstacle(x, -1.08, .26, .07);
-  }
-  box(.5, .46, .53, ivory, 9.29, .25, -2.3);
-  cylinder(.21, .10, ivory, 9.29, .51, -2.28);
-  const seat = mesh(new T.TorusGeometry(.145, .046, 10, 28), dark, 9.29, .585, -2.28); seat.rotation.x = -Math.PI/2;
-  box(.5, .67, .12, steel, 9.29, .56, -2.59);
-  for (const dx of [-.2, .2]) box(.06, .04, .22, dark, 9.29+dx, .12, -1.95);
-  obstacle(9.29, -2.34, .53, .61);
-  const hose = new T.CatmullRomCurve3([new T.Vector3(9.6,.25,-2.5),new T.Vector3(9.65,.9,-2.36),new T.Vector3(9.49,1.13,-2.2)]);
-  mesh(new T.TubeGeometry(hose, 16, .025, 8, false), dark, 0, 0, 0);
-  mesh(new T.ConeGeometry(.075, .13, 16), amber, 9.49, 1.17, -2.2);
-  box(.38, .48, .24, ivory, 8.46, .89, -2.38); // wipe/water dispenser, no shower
-  box(.22, .07, .03, dark, 8.46, .93, -2.24);
-  box(.34, .03, .23, steel, 8.47, .59, -2.33);
-  screen('HİJYEN · WHC', 8.96, 1.57, -2.689, .75, .32, ['Fanlı atık toplama', 'Su geri kazanım hattı']);
-
-  // Sliding privacy curtain: opening never swings into a walking corridor.
-  const curtain = new T.Group(); root.add(curtain);
-  for (let i=0; i<14; i++) box(.073, 1.79, .04, fabric, 8.51+i*.075, .92, -1.073+(i%2)*.015, curtain);
-  let privacyClosed = false;
-  curtain.scale.x = .12; curtain.position.x = 8.51*(1-.12);
-  const doorBounds = new T.Box3(new T.Vector3(8.48,world.floorY,-1.13),new T.Vector3(9.52,world.floorY+1.85,-1.01));
-  const layout = habitatLayout(world.floorY);
+  // Vacuum toilet (ISS WHC-style: airflow collection, seat, back panel).
+  box(.56, .43, .62, ivory, .65, .25, -5.9, M);
+  const seat = mesh(new T.TorusGeometry(.21, .055, 12, 40), steel, .65, .48, -5.86, M); seat.rotation.x = Math.PI / 2;
+  box(.52, .64, .2, steel, .65, .65, -6.25, M);
+  obstacle(9.65, -6.0, .62, .8);
+  // Hand-wash unit.
+  box(.6, .1, .45, ivory, .8, .85, -4.2, M);
+  mesh(new T.CylinderGeometry(.16, .13, .035, 24), steel, .8, .91, -4.2, M);
+  mesh(new T.TubeGeometry(new T.CatmullRomCurve3([new T.Vector3(.56,.91,-4.2), new T.Vector3(.56,1.12,-4.2), new T.Vector3(.73,1.14,-4.2), new T.Vector3(.8,1.08,-4.2)]), 20, .018, 8, false), steel, 0, 0, 0, M);
+  obstacle(9.8, -4.2, .6, .45);
+  // Shower stall: tray, rails, riser, head, drain and a frosted screen.
+  box(1.08, .065, 1.45, ivory, -.65, .035, -5.8, M);
+  for (const x of [-.52, .52]) box(.035, .055, 1.45, steel, -.65 + x, .085, -5.8, M);
+  mesh(new T.TubeGeometry(new T.CatmullRomCurve3([new T.Vector3(-.65,.55,-6.45), new T.Vector3(-.65,1.95,-6.45), new T.Vector3(-.65,2.02,-6.1), new T.Vector3(-.65,1.96,-6.02)]), 24, .018, 8, false), steel, 0, 0, 0, M);
+  mesh(new T.CylinderGeometry(.13, .13, .035, 24), steel, -.65, 1.93, -6.02, M);
+  box(.018, 1.55, 1.1, glass, -.12, .9, -5.9, M);
+  obstacle(8.35, -5.8, 1.08, 1.45);
+  screen('HİJYEN', 9.65, 1.65, -6.81, .7, .4, ['VAKUM TUVALET', 'ATIK SU HATTI']);
+  // Hinged privacy door (Samet: E opens/closes it).
+  const door = new T.Group(); door.position.set(-.76, 0, -3.07); M.add(door);
+  box(1.5, 2.16, .055, material({ color: 0xc5d4cc, roughness: .78 }), .75, 1.1, 0, door);
+  for (const z of [-.06, .06]) box(.05, .22, .065, steel, 1.33, 1.06, z, door);
+  let privacyOpen = false;
+  const doorBounds = obstacle(9, -3.07, 1.5, .1);  const layout = habitatLayout(world.floorY);
   const views = Object.fromEntries(Object.entries(layout).map(([id, room]) => [id, { position: room.position, target: room.target }]));
   Object.assign(world.views, views);
   root.updateMatrixWorld(true);
-  const batching = batchStaticLeaves(root, new Set([curtain]));
-  batchStaticLeaves(curtain);
+  const batching = batchStaticLeaves(root, new Set([door]));
   // Retain every pre-batch buffer for teardown; batchStaticLeaves deliberately doesn't dispose sources.
   root.traverse(part => { if (part.geometry) geometries.add(part.geometry); });
   let elapsed = .5, screenData = mapHabitatTelemetry(), updates = 0;
-  function nearPrivacy(x, z) { return Math.abs(x-9)<.68 && Math.abs(z+1.08)<.85; }
+  function nearPrivacy(x, z) { return Math.abs(x-9)<1.05 && Math.abs(z+3.07)<1.5; }
   return {
     root, layout, views, batching,
-    prompt(x,z) { return nearPrivacy(x,z) ? `E · Tuvalet perdesini ${privacyClosed ? 'aç' : 'kapat'}` : ''; },
+    prompt(x,z) { return nearPrivacy(x,z) ? `E · Tuvalet kapısını ${privacyOpen ? 'kapat' : 'aç'}` : ''; },
     interact(x,z) {
       if (!nearPrivacy(x,z)) return false;
-      // Don't close the curtain through the player's body.
-      if (!privacyClosed && Math.abs(z+1.07)<.32) return false;
-      privacyClosed = !privacyClosed;
-      curtain.scale.x = privacyClosed ? 1 : .12; curtain.position.x = 8.51*(1-curtain.scale.x);
-      if (privacyClosed) colliders.push(doorBounds);
-      else { const i=colliders.indexOf(doorBounds); if (i>=0) colliders.splice(i,1); }
+      if (privacyOpen && Math.abs(z+3.07)<.3) return false; // don't swing the door through the player
+      privacyOpen = !privacyOpen;
+      door.rotation.y = privacyOpen ? -Math.PI/2 : 0;
+      const i = colliders.indexOf(doorBounds);
+      if (privacyOpen && i >= 0) colliders.splice(i, 1); else if (!privacyOpen && i < 0) colliders.push(doorBounds);
       return true;
     },
     update(delta, source) {
@@ -246,7 +252,7 @@ export function createHabitatRooms(world) {
       screenData = mapHabitatTelemetry(typeof source === 'function' ? source() : source);
       atmosphere(screenData.atmosphere); utilities(screenData.utilities); laboratory(screenData.laboratory); updates++;
     },
-    get telemetry() { return { names: ROOM_NAMES, screens: screenData, screenUpdates: updates, privacyClosed, batching }; },
+    get telemetry() { return { names: ROOM_NAMES, screens: screenData, screenUpdates: updates, privacyClosed: !privacyOpen, batching }; },
     dispose() {
       root.removeFromParent();
       for (const part of retired) {
