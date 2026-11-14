@@ -1,6 +1,7 @@
 export const SIM_DT = 1 / 50;
 export const WARPS = Object.freeze([1, 2, 5, 10, 50, 1000, 100000]);
 export const canWarp = (warp, state) => WARPS.includes(warp) && (warp <= 10 || (state.engineFiring === false && state.inAtmosphere === false));
+export const canPlaybackRate = (rate, state) => Number.isFinite(rate) && rate >= 1 && rate <= WARPS.at(-1) && (rate <= 10 || (state.engineFiring === false && state.inAtmosphere === false));
 /** Fixed-step accumulator. A bounded work budget retains backlog; simulation time is never discarded.
  * Mission analytical coasts can optionally batch fixed ticks through advanceCoast() at high warp.
  */
@@ -10,15 +11,17 @@ export function createLoop({ step, render = () => {}, getState = () => ({}), adv
     get warp() { return warp; }, get paused() { return paused; }, get backlog() { return accumulator; },
     setPaused(value) { paused = Boolean(value); },
     setWarp(value) { if (!canWarp(value, getState())) return false; accumulator *= value / warp; warp = value; return true; },
+    // Fractional playback stays within the mission's accepted maximum and guard.
+    setPlaybackRate(value) { if (!canPlaybackRate(value, getState())) return false; accumulator *= value / warp; warp = value; return true; },
     reset() { accumulator = 0; warp = 1; paused = false; },
-    advance(realSeconds) {
+    advance(realSeconds, renderFrame = true) {
       if (!(realSeconds >= 0 && Number.isFinite(realSeconds))) throw new RangeError('Invalid elapsed time');
-      if (!canWarp(warp, getState())) { accumulator *= 10 / warp; warp = 10; }
+      if (!canPlaybackRate(warp, getState())) { accumulator *= 10 / warp; warp = 10; }
       if (!paused) {
         accumulator += realSeconds * warp;
         let count = 0;
         while (accumulator + 1e-12 >= SIM_DT && count < maxSteps) {
-          if (!canWarp(warp, getState())) {
+          if (!canPlaybackRate(warp, getState())) {
             // Only unconsumed real time is rescaled when a coast reaches a powered phase.
             // A large cruise frame must never spend its old 100000× backlog firing an engine.
             accumulator *= 10 / warp;
@@ -35,7 +38,7 @@ export function createLoop({ step, render = () => {}, getState = () => ({}), adv
         accumulator = Math.max(0, accumulator);
       }
       const alpha = Math.min(1, accumulator / SIM_DT);
-      render(alpha);
+      if (renderFrame) render(alpha);
       return alpha;
     }
   };

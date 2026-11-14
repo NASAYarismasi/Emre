@@ -2,7 +2,7 @@ export const DEFAULT_BINDINGS = Object.freeze({ forward: 'KeyW', back: 'KeyS', l
   lookLeft: 'ArrowLeft', lookRight: 'ArrowRight', lookUp: 'ArrowUp', lookDown: 'ArrowDown', sprint: 'ShiftLeft',
   interact: 'KeyE', watch: 'KeyQ', pause: 'KeyP', outside: 'Digit1', inside: 'Digit2', ground: 'Digit3', engine: 'Digit4', director: 'Digit5', map: 'Digit6',
   fullscreen: 'KeyF', burn: 'KeyB', warp: 'KeyT', stage: 'Space', camera: 'KeyC', help: 'KeyH', menu: 'Escape',
-  warpUp: 'Period', warpDown: 'Comma', manual: 'KeyA', fullThrottle: 'KeyZ', cutThrottle: 'KeyX', throttleUp: 'ShiftLeft', throttleDown: 'ControlLeft', mute: 'KeyM' });
+  warpUp: 'Period', warpDown: 'Comma', automatic: 'KeyR', manual: 'KeyA', fullThrottle: 'KeyZ', cutThrottle: 'KeyX', throttleUp: 'ShiftLeft', throttleDown: 'ControlLeft', mute: 'KeyM' });
 export function createInput(target, onAction = () => {}, initial = DEFAULT_BINDINGS) {
   const keys = new Set(), bindings = { ...initial };
   const keydown = event => {

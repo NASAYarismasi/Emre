@@ -1,5 +1,17 @@
 import { CREW_RATES } from '../data/sls.js';
 
+export function missionCalendar(t) {
+  if(t.phase==='CRUISE')return `Seyir · ${Math.min(Math.ceil(t.transfer.duration/86400),Math.floor(t.cruiseProgress*t.transfer.duration/86400)+1)}. gün / ${Math.ceil(t.transfer.duration/86400)}`;
+  return ({PRELAUNCH:'Kalkış hazırlığı',ASCENT:'Dünya’dan kalkış',PARKING_ORBIT:'Dünya park yörüngesi',TMI_BURN:'Mars transfer ateşlemesi',MOI_BURN:'Mars yakalama ateşlemesi',MARS_ORBIT:'Mars park yörüngesi',DEORBIT:'Mars’a yaklaşma',EDL:'Atmosfere giriş ve iniş',LANDED:'Mars yüzeyi',FAILED:'Görev değerlendirmesi'})[t.phase]??'Görev takibi';
+}
+
+export function missionElapsed(seconds) {
+  const value=Math.max(0,Math.floor(seconds)),days=Math.floor(value/86400),hours=Math.floor(value/3600)%24,minutes=Math.floor(value/60)%60;
+  return days?`T+ ${days} g ${hours} sa ${minutes} dk`:`T+ ${hours} sa ${minutes} dk ${value%60} sn`;
+}
+
+export const EVENT_CAPTIONS=Object.freeze({LIFTOFF:'Kalkış · Mars yolculuğu başladı',MAX_Q:'Max-Q · En yüksek aerodinamik yük',SRB_SEPARATION:'Katı iticiler ayrıldı',LAS_JETTISON:'Kurtarma kulesi ayrıldı',MECO:'Ana motor kesildi · Kademe ayrılması',ICPS_IGNITION:'Üst kademe ateşlendi',ORBIT_INSERTION:'Dünya park yörüngesine ulaşıldı',TMI_BURN:'Mars transfer ateşlemesi başladı',CRUISE:'Dünya’dan ayrılış · Gezegenler arası seyir',MOI_BURN:'Mars yakalama ateşlemesi başladı',MARS_ORBIT:'Mars park yörüngesine ulaşıldı',DEORBIT:'Yörüngeden çıkış · İniş koridoruna yaklaşma',EDL:'Mars atmosferine giriş',HEATSHIELD_JETTISON:'Isı kalkanı ayrıldı · İniş motorları ateşlendi',LEGS_DEPLOYED:'İniş bacakları açılıyor',TOUCHDOWN:'Temas · Mars’a hoş geldiniz'});
+
 /** UI projections only: all quantities originate in the mission snapshot. */
 export function vehicleConfiguration(t) {
   if (['DEORBIT','EDL','LANDED'].includes(t.phase) || t.mars && t.phase==='FAILED') return 'lander';
