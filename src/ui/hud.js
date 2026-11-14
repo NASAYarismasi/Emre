@@ -1,9 +1,8 @@
 import { G0, DAY, AU } from '../sim/constants.js';
 import { SLS } from '../data/sls.js';
-import { PHASE_LABELS } from './flightAdapters.js';
 import { saveLandingPayload, clearLandingPayload } from '../colony/handoff.js';
 import { landingSequence } from '../render/landingSequence.js';
-import { apsisReadout, vehicleConfiguration, resourceDays, nextEvent } from './presentation.js';
+import { apsisReadout, vehicleConfiguration, missionCalendar, missionElapsed, EVENT_CAPTIONS } from './presentation.js';
 import { mountWristTerminal } from './wristTerminal.js';
 import { flightWristData } from './wristData.js';
 const CAMERAS=['Takip','Kabin / iniş penceresi','Yer takibi','Motor kamerası','Sinematik','Yörünge haritası'];
@@ -28,7 +27,8 @@ export function landingCallout(t) {
 export function createHUD(commands){
   const root=document.getElementById('hud');
   root.innerHTML=`
-    <header class="topbar"><div class="identity"><span class="mission-mark">M<span>01</span></span><div><b>MARS’A İLK KOLONİ</b><small>ARTEMIS / ÖNCÜ MÜRETTEBAT GÖREVİ</small></div></div><div class="phase"><span class="live-dot"></span><span id="phase">FIRLATMA HAZIRLIĞI</span></div><div class="clock"><small>GÖREV ZAMANI</small><strong id="met">T− 00:00:10</strong><button id="warp-btn" title="Zaman hızı">1×</button></div></header>
+    <header class="topbar"><div class="identity"><span class="mission-mark">M<span>01</span></span><div><b>MARS’A İLK KOLONİ</b><small>ARTEMIS / ÖNCÜ MÜRETTEBAT GÖREVİ</small></div></div><div class="phase"><span class="live-dot"></span><span id="phase">Kalkış hazırlığı</span></div><div class="clock"><small>Gerçek görev zamanı</small><strong id="met">T+ 0 sa 0 dk 0 sn</strong><div class="pacing-controls"><span id="playback-rate">Gösterim ×1 · otomatik</span><button id="auto-btn" title="R / Sinematik akışı aç veya kapat">Otomatik akış: AÇIK</button><button id="warp-btn" title="T / Manuel hız · Basılı tut: otomatik akış">×1</button></div></div></header>
+    <div id="event-caption" role="status" aria-live="polite" hidden></div>
     <section class="telemetry instrument"><div class="section-label">UÇUŞ TELEMETRİSİ <span>CANLI</span></div><div class="main-value"><small id="alt-label">İRTİFA</small><strong id="alt">0,0</strong><span id="alt-unit">km</span><div class="micro-line"></div></div><div class="main-value"><small id="velocity-label">YÜZEYE GÖRE HIZ</small><strong id="vel">0,00</strong><span>km/s</span></div><dl class="data-rows"><div><dt>Düşey hız</dt><dd id="vs">0 m/s</dd></div><div><dt>Mach</dt><dd id="mach">0,00</dd></div><div id="q-row"><dt>Dinamik basınç</dt><dd id="q">0 kPa</dd></div><div><dt>G yükü</dt><dd id="g">1,00 g</dd></div><div><dt>Uçuş yolu açısı</dt><dd id="gamma">90°</dd></div></dl><div id="maxq" class="flag" hidden>TEPE BASINÇ · AERODİNAMİK YÜK</div><div class="attitude"><div class="attitude-ring"><div id="horizon"></div><span>+</span></div><div><small>YÖNLENDİRME</small><b id="guidance">OTOPİLOT</b><small id="thermal">GNC / NOMİNAL</small></div></div></section>
     <section class="vehicle-panel instrument"><div class="section-label">ARAÇ SİSTEMLERİ <span id="stage-name">SLS B1</span></div><div class="stack-layout"><div id="stack-drawing" class="stack-drawing"><i class="las"></i><i class="capsule"></i><i class="upper"></i><i class="core"></i><i class="booster left"></i><i class="booster right"></i><i class="engine"></i><i class="solar left"></i><i class="solar right"></i><i class="leg left"></i><i class="leg right"></i></div><div class="fuel-stack">${['icps','core','srb'].map(id=>`<div class="fuel" id="fuel-${id}"><div><b id="fuel-label-${id}">${id.toUpperCase()}</b><span id="fuel-value-${id}">100%</span></div><div class="bar"><i id="fuel-bar-${id}"></i></div><small id="fuel-status-${id}">BAĞLI</small></div>`).join('')}</div></div><div class="throttle"><span>GAZ KOLU</span><b id="throttle">100%</b><div class="bar"><i id="throttle-bar"></i></div></div><div class="engine-status"><span id="engine-label">RS-25 / 4</span><div>${Array.from({length:6},(_,i)=>`<i id="engine-${i}"></i>`).join('')}</div></div><div class="crew-status"><span>YAŞAM DESTEĞİ</span><b>03 / MÜRETTEBAT</b><small id="supplies">O₂ · SU · GIDA NOMİNAL</small></div></section>
     <div class="view-caption"><span class="view-indicator"></span><span id="camera-name">01 / TAKİP</span><small id="location">KENNEDY UZAY MERKEZİ / LC-39B</small></div>
@@ -45,7 +45,7 @@ export function createHUD(commands){
     <div id="landing-fade" hidden aria-live="polite" style="position:fixed;inset:0;z-index:15;background:#020303;color:#e2ded5;display:flex;align-items:center;justify-content:center;flex-direction:column;pointer-events:none;opacity:0;font-family:Barlow,sans-serif"><span style="font-size:clamp(24px,4vw,48px);font-weight:500;letter-spacing:.08em">Sol 1 · Jezero Krateri</span><small style="margin-top:18px;letter-spacing:.22em;color:#a7a69f">İLK KOLONİ · YÜZEY OPERASYONLARI</small></div>
     <!-- END INIS landing chapter fade. -->
     <footer class="bottom"><div class="orbit-strip"><span>YÖRÜNGE ÇÖZÜMÜ</span><span><em id="ap-label">AP</em> <b id="apo">—</b> <small id="ap-unit">km</small></span><span><em id="pe-label">PE</em> <b id="peri">—</b> <small id="pe-unit">km</small></span><span id="extra-metric">LC-39B / 28,627° K</span></div><div class="timeline" id="timeline"></div><nav class="camera-nav" aria-label="Kameralar">${CAMERAS.map((name,i)=>`<button data-camera="${i}" title="${i+1} / ${name}"><kbd>${i+1}</kbd>${name}</button>`).join('')}<button id="watch-btn">Q / KOL BİLGİSAYARI</button><button id="help-btn" class="help-button">H / KONTROLLER</button><button id="pause-btn" aria-label="Duraklat">Ⅱ</button></nav></footer>
-    <div id="help-overlay" class="overlay" hidden><section class="dialog"><small>UÇUŞ EL KİTABI</small><h2>Görev sizin kontrolünüzde.</h2><div class="help-grid"><p><kbd>Boşluk / E</kbd>Geri sayım / güvenli kademe atımı</p><p><kbd>C / 1–6</kbd>Kamera değiştir / seç</p><p><kbd>Fare / Tekerlek</kbd>Takip kamerasını döndür / yakınlaştır</p><p><kbd>B</kbd>Park yörüngesinde manevra başlat</p><p><kbd>, / . / T</kbd>Zamanı yavaşlat / hızlandır</p><p><kbd>A</kbd>Manuel gaz kolu / otopilot</p><p><kbd>Shift / Ctrl · Z / X</kbd>Gaz artır / azalt · tam / kes</p><p><kbd>M · F</kbd>Sesi kapat · tam ekran</p><p><kbd>Esc / P</kbd>Duraklat / devam et</p><p><kbd>H</kbd>Bu rehberi aç / kapat</p><p><kbd>Q</kbd>Kol bilgisayarını aç / kapat</p></div><p class="muted">Atmosferde ve motor yanarken en fazla 10×. Varsayılan yönlendirme otopilottur; Mars inişi otomatik yapılır.</p><button id="help-close">ANLAŞILDI / H</button></section></div>
+    <div id="help-overlay" class="overlay" hidden><section class="dialog"><small>UÇUŞ EL KİTABI</small><h2>Görev sizin kontrolünüzde.</h2><div class="help-grid"><p><kbd>Boşluk / E</kbd>Geri sayım / güvenli kademe atımı</p><p><kbd>C / 1–6</kbd>Kamera değiştir / seç</p><p><kbd>Fare / Tekerlek</kbd>Takip kamerasını döndür / yakınlaştır</p><p><kbd>B</kbd>Park yörüngesinde manevra başlat</p><p><kbd>, / . / T</kbd>Zamanı yavaşlat / hızlandır</p><p><kbd>R</kbd>Sinematik akışı aç / kapat</p><p><kbd>A</kbd>Manuel gaz kolu / otopilot</p><p><kbd>Shift / Ctrl · Z / X</kbd>Gaz artır / azalt · tam / kes</p><p><kbd>M · F</kbd>Sesi kapat · tam ekran</p><p><kbd>Esc / P</kbd>Duraklat / devam et</p><p><kbd>H</kbd>Bu rehberi aç / kapat</p><p><kbd>Q</kbd>Kol bilgisayarını aç / kapat</p></div><p class="muted">Atmosferde ve motor yanarken en fazla 10×. Varsayılan yönlendirme otopilottur; Mars inişi otomatik yapılır.</p><button id="help-close">ANLAŞILDI / H</button></section></div>
     <div id="pause-overlay" class="overlay" hidden><section class="dialog pause-dialog"><small>GÖREV BEKLEMEDE</small><h2>Uçuş duraklatıldı.</h2><label>Görüntü kalitesi<select id="quality"><option>Düşük</option><option selected>Orta</option><option>Yüksek</option></select></label><label class="check">Uyarlanabilir kalite<input id="adaptive" type="checkbox" checked></label><label>Ana ses<input id="volume" type="range" min="0" max="1" value=".4" step=".01"></label><button id="mute-btn">M / SESİ KAPAT</button><div class="pause-actions"><button id="resume-btn">UÇUŞA DEVAM ET ↗</button><button id="reset-btn" class="secondary">GÖREVİ SIFIRLA</button></div><p id="performance" class="muted"></p></section></div>
   `;
   const nodes=Object.fromEntries([...root.querySelectorAll('[id]')].map(n=>[n.id,n])),listeners=[];
@@ -76,15 +76,35 @@ export function createHUD(commands){
   bind('colony-chapter',()=>{clearLandingPayload();location.href='colony.html';});
   // BOLUM: use the same command surface as automated chapter selection.
   bind('landing-chapter',()=>commands.startChapter('mars-orbit'));
-  bind('start-btn',()=>commands.startChapter('launch'));bind('title-controls',commands.help);bind('about-btn',commands.about);bind('about-close',commands.about);bind('watch-btn',commands.watch);bind('burn-btn',commands.burn);bind('warp-btn',()=>commands.warp(1));bind('help-btn',commands.help);bind('help-close',commands.help);bind('pause-btn',commands.pause);bind('resume-btn',commands.pause);bind('reset-btn',commands.reset);bind('mute-btn',commands.mute);
+  let warpHold,warpHeld=false;
+  const cancelWarpHold=()=>{clearTimeout(warpHold);warpHold=undefined;};
+  on(nodes['warp-btn'],'pointerdown',()=>{warpHeld=false;cancelWarpHold();warpHold=setTimeout(()=>{warpHeld=true;commands.automatic();},550);});
+  for(const event of ['pointerup','pointerleave','pointercancel'])on(nodes['warp-btn'],event,cancelWarpHold);
+  listeners.push(cancelWarpHold);
+  bind('start-btn',()=>commands.startChapter('launch'));bind('title-controls',commands.help);bind('about-btn',commands.about);bind('about-close',commands.about);bind('watch-btn',commands.watch);bind('burn-btn',commands.burn);bind('warp-btn',()=>{if(!warpHeld)commands.warp(1);warpHeld=false;});bind('auto-btn',commands.automatic);bind('help-btn',commands.help);bind('help-close',commands.help);bind('pause-btn',commands.pause);bind('resume-btn',commands.pause);bind('reset-btn',commands.reset);bind('mute-btn',commands.mute);
   root.querySelectorAll('[data-camera]').forEach(b=>on(b,'click',()=>commands.camera(Number(b.dataset.camera))));
   on(nodes.quality,'change',()=>commands.quality(nodes.quality.value,nodes.adaptive.checked));on(nodes.adaptive,'change',()=>commands.quality(nodes.quality.value,nodes.adaptive.checked));on(nodes.volume,'input',()=>commands.volume(Number(nodes.volume.value)));
-  let eventKey='';
+  let eventKey='',caption='',captionUntil=0,lastCaptionTime=-1,seenEvents=new Set();
   const text=(id,value)=>{if(nodes[id].textContent!==value)nodes[id].textContent=value;};
   return {ready(failures){nodes['start-btn'].disabled=false;nodes['landing-chapter'].disabled=false;text('loading',failures.length?'Sistemler hazır / doku yedeği aktif':'Tüm uçuş sistemleri hazır');},progress(done,total){text('loading',`NASA VARLIKLARI / ${done} / ${total}`);},
     update(t,ui){
       const launch=['PRELAUNCH','ASCENT'].includes(t.phase),stacked=launch||t.phase==='PARKING_ORBIT',cd=t.countdown;
-      text('phase',PHASE_LABELS[t.phase]??t.phase);text('met',formatMET(t.phase==='PRELAUNCH'?cd.time:t.missionTime));text('warp-btn',`${ui.warp}×`);
+      text('phase',missionCalendar(t));text('met',missionElapsed(t.missionTime));text('warp-btn',`×${number(ui.warp,0)}`);
+      const automatic=ui.pacing?.mode!=='manual';
+      text('playback-rate',`Gösterim ×${number(ui.warp,ui.warp<10?1:0)} · ${automatic?'otomatik':'manuel'}`);
+      text('auto-btn',`Otomatik akış: ${automatic?'AÇIK':'KAPALI'}`);nodes['auto-btn'].setAttribute('aria-pressed',String(automatic));
+      const now=performance.now();
+      if(t.missionTime<lastCaptionTime||ui.title){seenEvents.clear();caption='';captionUntil=0;}
+      const captionEvents=[...t.events];
+      if(t.maxQ?.time>0&&(t.time??0)>t.maxQ.time+1)captionEvents.push({type:'MAX_Q',time:t.maxQ.time});
+      for(const event of captionEvents){
+        const key=`${event.type}:${event.time}`;
+        if(seenEvents.has(key))continue;
+        seenEvents.add(key);
+        if(EVENT_CAPTIONS[event.type]&&t.missionTime-event.time<Math.max(3,ui.warp*.15)){caption=EVENT_CAPTIONS[event.type];captionUntil=now+4500;}
+      }
+      lastCaptionTime=t.missionTime;
+      text('event-caption',caption);nodes['event-caption'].hidden=ui.title||!caption||now>captionUntil;
       text('alt',number((t.altitude??0)/1000,t.altitude<1000?3:1));text('vel',number((t.surfaceVelocity??t.velocity??t.heliocentric.speed)/1000,2));text('velocity-label',t.phase==='CRUISE'?'GÜNEŞ’E GÖRE HIZ':t.surfaceVelocity!==undefined?'YÜZEYE GÖRE HIZ':'YÖRÜNGE HIZI');
       text('alt-label',t.phase==='CRUISE'?'GÜNEŞ’E UZAKLIK':'İRTİFA');text('alt-unit',t.phase==='CRUISE'?'AU':'km');
       if(t.phase==='CRUISE')text('alt',number(Math.hypot(...t.heliocentric.ship)/AU,3));
