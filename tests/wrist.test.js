@@ -133,6 +133,34 @@ function terminalFixture() {
 afterEach(() => { vi.useRealTimers(); });
 
 describe('ARES keyboard and lifecycle', () => {
+  it('keeps decorative grip layers outside the interactive case and follows host lighting', () => {
+    vi.useFakeTimers();
+    const fixture = terminalFixture();
+    const exitPointerLock = vi.fn();
+    fixture.root.ownerDocument.exitPointerLock = exitPointerLock;
+    let data = flightWristData();
+    const terminal = mountWristTerminal({ root: fixture.root, getData: () => data });
+    const markup = fixture.host.innerHTML;
+    expect(markup.indexOf('ares-grip-back')).toBeLessThan(markup.indexOf('<section class="ares-case"'));
+    expect(markup.indexOf('ares-grip-front')).toBeGreaterThan(markup.indexOf('</section>'));
+    expect(markup.match(/alt="" aria-hidden="true" draggable="false"/g)).toHaveLength(2);
+    expect(markup).not.toContain('class="ares-sleeve"');
+    expect(fixture.host.setAttribute).toHaveBeenCalledWith('aria-hidden', 'true');
+    terminal.setRaised(true);
+    expect(fixture.nodes.get('.ares-arm').inert).toBe(false);
+    expect(fixture.host.setAttribute).toHaveBeenCalledWith('aria-hidden', 'false');
+    expect(fixture.host.setAttribute).toHaveBeenCalledWith('data-light', 'cabin');
+    data = colonyWristData(); terminal.update();
+    expect(fixture.host.setAttribute).toHaveBeenCalledWith('data-light', 'mars');
+    fixture.tabs[2].dispatchEvent(new Event('click'));
+    expect(terminal.screen).toBe(2);
+    fixture.nodes.get('.ares-close').dispatchEvent(new Event('click'));
+    expect(terminal.raised).toBe(false);
+    expect(fixture.nodes.get('.ares-arm').inert).toBe(true);
+    expect(exitPointerLock).not.toHaveBeenCalled();
+    terminal.dispose();
+  });
+
   it('toggles once with Alt/Q, cycles with Tab/Shift+Tab/wheel, closes with Escape and releases listeners', () => {
     vi.useFakeTimers();
     const fixture = terminalFixture(), onToggle = vi.fn();

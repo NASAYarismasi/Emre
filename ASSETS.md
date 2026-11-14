@@ -93,3 +93,6 @@ Düz Ova, yukarıda tarihsel olarak anlatılan MOLA bölgesel ufku / krater ekos
 Rover lens adaptation: `src/colony/ova/assets.mjs` disables screen-space transmission on three tiny NASA camera-lens materials and uses translucent glass instead. Meshes, textures, scales and source GLB bytes are unchanged; this removes an extra whole-scene refraction pass on software GL.
 
 | `public/models/colony/team-astronaut-walk.glb` | NASA astronaut suit (`public/assets/astronaut.glb`), arms lowered and split into shoulder/hip-jointed limbs by `scripts/pose-walker.py` (Blender) | Same source licence as astronaut.glb |
+
+<!-- // TABLET: original layered SVG artwork provenance. -->
+`public/art/eva-tablet-grip-back.svg` ve `eva-tablet-grip-front.svg`: bu proje için çizilen özgün EVA eldivenleri, manşetler ve kumaş detayları; [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). Harici görsel veya NASA modelinden türetilmedi; ekipman oranları temsili oyun tasarımıdır. Tablet kasası CSS ile çizilir, ARES ekran tasarımı Samet'indir.

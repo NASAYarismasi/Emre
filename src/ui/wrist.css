@@ -1,28 +1,27 @@
-/* Samet's ARES orange phosphor display, dark metal case and ivory EVA forearm.
-   CSS geometry is original project artwork; no external assets or GPU canvas. */
+/* TABLET: original CC0 layered EVA artwork. All dimensions/lighting are visual game assumptions.
+   DOM/SVG only: no WebGL draws, lights, frame callbacks or additional mission state. */
 .ares-wrist{position:fixed;inset:0;z-index:80;pointer-events:none;overflow:hidden;isolation:isolate;color:#fed7aa;font:12px/1.45 "Courier New",monospace;text-align:left;--ares-orange:#f97316;--ares-line:#f9731659}
 .ares-wrist *{box-sizing:border-box}
-.ares-arm{position:absolute;width:720px;height:465px;left:50%;bottom:36px;transform-origin:12% 115%;transform:translate(-50%,145%) rotate(31deg);opacity:0;visibility:hidden;transition:transform .58s cubic-bezier(.22,.75,.24,1),opacity .23s,visibility 0s .58s;will-change:transform}
-.ares-wrist.is-raised .ares-arm{transform:translate(-50%,0) rotate(-7deg);opacity:1;visibility:visible;transition:transform .68s cubic-bezier(.18,.8,.22,1),opacity .2s,visibility 0s}
-.ares-sleeve{position:absolute;left:-140px;top:214px;width:720px;height:248px;border-radius:46% 22% 30% 40%;transform:rotate(7deg);background:repeating-linear-gradient(93deg,transparent 0 34px,#78776b40 36px,#f8f4dc52 40px,transparent 46px),linear-gradient(#a4a598,#eeeddb 26%,#cccbb9 59%,#77796e 96%);box-shadow:inset 0 5px 9px #fff7,inset 0 -20px 30px #292c2980,0 20px 40px #0006;border:2px solid #97998c}
-.ares-sleeve:before,.ares-sleeve:after{content:"";position:absolute;inset:24px 30px;border-top:2px dashed #6f736c80;border-bottom:2px dashed #6f736c80;border-radius:40%}
-.ares-sleeve:after{inset:57px 24px;border-style:solid;opacity:.3}
-.ares-sleeve>i{position:absolute;left:155px;top:24px;width:43px;height:195px;border:4px solid #73362d;background:linear-gradient(90deg,#7c3a2e,#b65a41,#6d3026);transform:rotate(2deg)}
-.ares-sleeve>span{position:absolute;bottom:42px;left:255px;letter-spacing:3px;color:#444c47;font-weight:bold;font-size:15px}
-.ares-cuff{position:absolute;left:549px;top:231px;width:52px;height:181px;border-radius:16px;transform:rotate(5deg);background:repeating-linear-gradient(90deg,#283239 0 7px,#6e7979 9px,#20292f 13px);border:3px solid #a3aaa0;box-shadow:5px 4px 10px #0008}
-.ares-glove{position:absolute;left:585px;top:228px;width:139px;height:163px;border-radius:26% 43% 36% 25%;transform:rotate(-5deg);background:linear-gradient(150deg,#e2e1cf,#a4ab9e 48%,#495751);border:2px solid #89958b;box-shadow:inset -9px -6px 13px #25332c80,0 10px 20px #0006}
-.ares-glove:before{content:"";position:absolute;left:3px;top:-20px;width:86px;height:52px;transform:rotate(-28deg);border-radius:40%;background:linear-gradient(#b8bcaa,#707f73);border:2px solid #879184}
-.ares-glove>i{display:block;position:absolute;right:10px;top:28px;width:25px;height:100px;border-right:2px solid #5c6b60;border-radius:50%;transform:rotate(-12deg)}
-.ares-glove>i:nth-child(2){right:40px}.ares-glove>i:nth-child(3){right:70px}
-.ares-strap{position:absolute;top:168px;width:42px;height:267px;background:repeating-linear-gradient(0deg,#1b2228 0 3px,#353d42 4px 6px);border:3px solid #4c5659;border-radius:12px;transform:rotate(6deg);box-shadow:0 4px 8px #0008}
-.ares-strap-a{left:233px}.ares-strap-b{left:491px}
-.ares-case{position:absolute;left:57px;top:24px;width:548px;height:352px;padding:19px 22px 28px;border:3px solid #596264;border-radius:23px;background:linear-gradient(125deg,#596163,#222930 13%,#323b40 72%,#12191f);box-shadow:inset 0 2px 1px #c2cccb60,inset 0 -6px 4px #0a0e14,0 12px 0 #0d141a,0 17px 19px #0008;pointer-events:none}
+.ares-arm{position:absolute;width:900px;height:620px;left:calc(50% - 450px);bottom:-78px;transform-origin:50% 100%;transform:translateY(125%) rotate(14deg);opacity:0;visibility:hidden;transition:transform .55s cubic-bezier(.4,0,.7,.3),opacity .3s,visibility 0s .55s}
+.ares-wrist.is-raised .ares-arm{transform:translateY(0) rotate(-3deg);opacity:1;visibility:visible;transition:transform .76s cubic-bezier(.16,.86,.25,1),opacity .28s,visibility 0s}
+.ares-hold{position:relative;width:100%;height:100%;transform-origin:50% 80%;isolation:isolate}
+.is-raised .ares-hold{animation:ares-hold-breath 6.5s ease-in-out .8s infinite}
+@keyframes ares-hold-breath{0%,100%{transform:translateY(0) rotate(.08deg)}50%{transform:translateY(-3px) rotate(-.08deg)}}
+.ares-grip{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;user-select:none;object-fit:contain}
+.ares-grip-back{z-index:0}.ares-grip-front{z-index:2}
+.ares-wrist[data-light=mars] .ares-grip{filter:sepia(.16) saturate(.83) brightness(.94)}
+.ares-case{position:absolute;z-index:1;left:150px;top:64px;width:600px;height:394px;padding:31px 25px 29px;border:2px solid #687276;border-radius:22px;background:linear-gradient(130deg,#758081 0,#424d53 3%,#242e35 19%,#333d43 62%,#1b252b 94%,#515e61);box-shadow:inset 0 2px 1px #e0e8df80,inset 2px 0 2px #afbab430,inset -2px -5px 2px #0a1319,0 3px 0 #121e25,0 9px 0 #131c22,0 11px 0 1px #465054,0 22px 26px #0008;pointer-events:none}
 .is-raised .ares-case{pointer-events:auto}
-.ares-case:after{content:"";position:absolute;right:-10px;top:102px;width:8px;height:66px;border-radius:0 4px 4px 0;background:repeating-linear-gradient(#6b7777 0 3px,#273138 4px 6px)}
-.ares-screw{position:absolute;width:7px;height:7px;border-radius:50%;background:linear-gradient(45deg,#82908f 40%,#1a2328 41% 56%,#72817e 57%);box-shadow:0 1px 2px #000}
-.ares-screw-tl{top:8px;left:9px}.ares-screw-tr{top:8px;right:9px}.ares-screw-bl{bottom:10px;left:9px}.ares-screw-br{bottom:10px;right:9px}
-.ares-screen{position:relative;height:100%;overflow:hidden;border:1px solid #f97316aa;border-radius:7px;background:radial-gradient(ellipse at 40% 0,#202735,#090e15 75%);box-shadow:0 0 0 5px #0b1017,0 0 12px #f9731626,inset 0 0 22px #0006;padding:10px 13px;display:flex;flex-direction:column}
-.ares-screen:after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,#0002 0 1px,transparent 1px 4px);opacity:.45}
+.ares-wrist[data-light=mars] .ares-case{background:linear-gradient(130deg,#827e76,#484e50 5%,#2c3135 25%,#343b3d 70%,#20272b 95%,#5a605e)}
+.ares-case:before{content:"";position:absolute;inset:1px;border-radius:19px;pointer-events:none;background:repeating-linear-gradient(112deg,#d8e4dd05 0 1px,transparent 1px 4px);box-shadow:inset 0 0 0 5px #111a201f}
+.ares-case:after{content:"";position:absolute;right:-8px;top:118px;width:7px;height:65px;border:1px solid #5f6c6c;border-radius:0 4px 4px 0;background:repeating-linear-gradient(#586666 0 2px,#19272e 3px 6px);box-shadow:1px 2px 4px #0008}
+.ares-screw{position:absolute;z-index:1;width:8px;height:8px;border:1px solid #a2acab80;border-radius:50%;background:linear-gradient(135deg,#a2aeaa 0,#677574 37%,#14232b 40% 57%,#899590 60%,#4c5b5b);box-shadow:0 0 0 4px #192329,0 0 0 5px #566265,0 2px 3px 5px #07101860}
+.ares-screw-tl{top:13px;left:13px}.ares-screw-tr{top:13px;right:13px}.ares-screw-bl{bottom:12px;left:13px}.ares-screw-br{bottom:12px;right:13px}
+.ares-hardware{position:absolute;top:9px;left:38px;right:38px;display:flex;align-items:center;gap:5px;height:10px;color:#b6c0b9;font-size:7px;letter-spacing:2px;text-shadow:0 1px 1px #000}
+.ares-hardware>span{flex:1}.ares-hardware>i{width:16px;height:2px;background:#121d23;box-shadow:0 1px 0 #73807b60}.ares-hardware>b{margin-left:8px;font-size:8px;color:#d5bd8a}
+.ares-screen{position:relative;height:100%;overflow:hidden;border:1px solid #a26b3f;border-radius:7px;background:radial-gradient(ellipse at 30% 0,#202b36,#0c141c 72%);box-shadow:0 0 0 5px #0c161d,0 0 0 6px #67706a66,inset 1px 3px 9px #0009;padding:12px 15px;display:flex;flex-direction:column}
+.ares-screen:before{content:"";position:absolute;inset:0;z-index:2;pointer-events:none;border-radius:6px;background:linear-gradient(122deg,#e3eff008 0,#dfe8e905 25%,transparent 25.2%,transparent 75%,#dfe8e903 100%);box-shadow:inset 0 1px 0 #dde8dc20}
+.ares-screen:after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,#0002 0 1px,transparent 1px 4px);opacity:.16}
 .ares-wrist .ares-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;gap:8px;margin:0;border-bottom:1px solid var(--ares-line);padding:0 0 5px}
 .ares-header>b{font-size:19px;letter-spacing:3px;color:#ffedd5;text-shadow:0 0 12px #f9731670}
 .ares-header>b>span{font-size:10px;letter-spacing:1px;color:#fb923c}
@@ -48,9 +47,14 @@
 .ares-crew>article{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:8px;border-bottom:1px solid var(--ares-line);background:#0d151f70}
 .ares-crew>article b{color:#ffedd5;font-size:11px}.ares-crew>article span{display:block;color:#bf9979;font-size:10px}.ares-crew>article strong{color:#fdba74;font-size:11px;text-align:right}
 .ares-wrist .ares-footer{display:flex;align-items:center;justify-content:space-between;gap:7px;border-top:1px solid var(--ares-line);margin-top:8px;padding-top:6px;color:#b98b68;font-size:8px;letter-spacing:.1px}
-.ares-footer>b{color:#fed7aa;white-space:nowrap}.ares-case-label{position:absolute;bottom:7px;left:25px;right:25px;display:flex;justify-content:space-between;font-size:8px;letter-spacing:2px;color:#8a9695}
-@media(max-width:760px){.ares-arm{scale:.8;bottom:-15px;left:48%}}
-@media(max-width:580px){.ares-arm{scale:.61;bottom:-58px;left:47%}}
-@media(max-width:420px){.ares-arm{scale:.5;bottom:-82px;left:45%}}
-@media(max-height:560px) and (min-width:581px){.ares-arm{scale:.75;bottom:-47px}}
-@media(prefers-reduced-motion:reduce){.ares-arm,.ares-wrist.is-raised .ares-arm{transition:opacity .12s;will-change:auto}}
+.ares-footer>b{color:#fed7aa;white-space:nowrap}.ares-case-label{position:absolute;bottom:8px;left:36px;right:36px;display:flex;justify-content:space-between;font-size:8px;letter-spacing:2px;color:#8a9695}
+/* Scale the complete rig, never the glove layers independently. */
+@media(min-width:1800px) and (min-height:1100px){.ares-arm{scale:1.22;bottom:-90px}}
+@media(max-width:940px){.ares-arm{scale:.9;bottom:-85px}}
+@media(max-width:760px){.ares-arm{scale:.77;bottom:-90px}}
+@media(max-width:620px){.ares-arm{scale:.65;bottom:-85px}}
+@media(max-width:520px){.ares-arm{scale:.61;bottom:-75px}}
+@media(max-width:440px){.ares-arm{scale:.54;bottom:-65px}}
+@media(max-width:370px){.ares-arm{scale:.46;bottom:-55px}}
+@media(max-height:600px) and (min-width:761px){.ares-arm{scale:.78;bottom:-78px}}
+@media(prefers-reduced-motion:reduce){.ares-arm,.ares-wrist.is-raised .ares-arm{transition:opacity .12s}.is-raised .ares-hold{animation:none}}

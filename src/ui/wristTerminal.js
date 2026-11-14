@@ -1,5 +1,5 @@
 /**
- * ARES Mark-IV wrist terminal — original arm, case and orange display design by Samet.
+ * ARES Mark-IV terminal — Samet's orange display, with an original layered EVA grip.
  * DOM/CSS adaptation shares one lightweight overlay between flight and colony.
  * No extra renderer, texture, simulated medical readings or independent mission clock.
  */
@@ -50,17 +50,21 @@ export function mountWristTerminal({ root, getData, onToggle = () => {} }) {
   host.className = 'ares-wrist';
   host.setAttribute('aria-label', 'ARES kol bilgisayarı');
   host.setAttribute('aria-hidden', 'true');
-  host.innerHTML = `<div class="ares-arm" inert>
-    <div class="ares-sleeve" aria-hidden="true"><i></i><span>ARES / EVA</span></div>
-    <div class="ares-glove" aria-hidden="true"><i></i><i></i><i></i></div>
-    <div class="ares-cuff" aria-hidden="true"></div><div class="ares-strap ares-strap-a" aria-hidden="true"></div><div class="ares-strap ares-strap-b" aria-hidden="true"></div>
+  // TABLET: one coordinate system keeps the grip attached during resizing and animation.
+  // GAME ASSUMPTION: illustrative EVA equipment proportions; no physical readings are invented.
+  const artBase = `${import.meta.env.BASE_URL}art/`;
+  host.innerHTML = `<div class="ares-arm" inert><div class="ares-hold">
+    <img class="ares-grip ares-grip-back" src="${artBase}eva-tablet-grip-back.svg" alt="" aria-hidden="true" draggable="false" width="900" height="620">
     <section class="ares-case"><i class="ares-screw ares-screw-tl"></i><i class="ares-screw ares-screw-tr"></i><i class="ares-screw ares-screw-bl"></i><i class="ares-screw ares-screw-br"></i>
+      <div class="ares-hardware" aria-hidden="true"><span>ARES / EVA</span><i></i><i></i><i></i><b>IV</b></div>
       <div class="ares-screen"><header class="ares-header"><b><i></i> ARES <span>MARK-IV</span></b><button type="button" class="ares-close" aria-label="Kolu indir">ESC ×</button></header>
       <div class="ares-location"><span data-ares-phase></span><time data-ares-clock></time></div>
       <nav class="ares-tabs" aria-label="Terminal ekranları">${['DURUM', 'YAŞAM DESTEĞİ', 'SEYİR', 'MÜRETTEBAT'].map((name, index) => `<button type="button" data-ares-tab="${index}" aria-pressed="${index === 0}">${name}</button>`).join('')}</nav>
       <div class="ares-content"></div><footer class="ares-footer"><span>ALT / Q · KOLU İNDİR</span><span>TAB / TEKERLEK · SAYFA</span><b data-ares-page>01 / 04</b></footer></div>
-      <div class="ares-case-label" aria-hidden="true">EVA WRIST TERMINAL <span>ARES—01</span></div>
-    </section></div>`;
+      <div class="ares-case-label" aria-hidden="true">EVA · GÖREV TERMİNALİ <span>ARES—01</span></div>
+    </section>
+    <img class="ares-grip ares-grip-front" src="${artBase}eva-tablet-grip-front.svg" alt="" aria-hidden="true" draggable="false" width="900" height="620">
+    </div></div>`;
   root.append(host);
   const arm = host.querySelector('.ares-arm'), content = host.querySelector('.ares-content');
   const phase = host.querySelector('[data-ares-phase]'), clock = host.querySelector('[data-ares-clock]');
@@ -75,6 +79,7 @@ export function mountWristTerminal({ root, getData, onToggle = () => {} }) {
   function update() {
     if (!raised || disposed) return;
     const data = getData();
+    host.setAttribute('data-light', data?.mode === 'colony' ? 'mars' : 'cabin');
     const markup = data ? screenMarkup(data, screen) : '<p class="ares-note">Telemetri bağlantısı bekleniyor.</p>';
     if (markup !== lastMarkup) { content.innerHTML = markup; lastMarkup = markup; }
     phase.textContent = data?.mode === 'colony' ? `JEZERO · SOL ${format(data.sol, 0)}` : data?.phaseLabel ?? 'VERİ BEKLENİYOR';
