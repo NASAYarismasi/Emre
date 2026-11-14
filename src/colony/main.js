@@ -5,12 +5,16 @@ import { readLandingPayload } from './handoff.js';
 import { mountWristTerminal } from '../ui/wristTerminal.js';
 import { colonyWristData } from '../ui/wristData.js';
 import { REALISM_NOTES, REALISM_SOURCES } from './realism.js';
+// DASHBOARD: independent read-only observer; scene hooks remain owned by the host.
+import { mountDashboard } from './dashboard.mjs';
 
 const landing = readLandingPayload(exampleLanding);
 // ARES integration: subscribe before the scene emits its first colony:state snapshot.
 // The initial projection is read-only; the scene remains the sole colony state owner.
 // Flight payload supplies are crew-sols; İhan's createColonyFromFlight converts them to person-sols.
 let wristDetail = { state: landing.source === 'flight' ? createColonyFromFlight(landing) : createColony(landing) };
+// DASHBOARD: capture overlay keys before wrist and scene listeners are registered.
+const dashboard = mountDashboard({ onOpen: () => { closeDrawer(false); wrist.setRaised(false); } });
 const wrist = mountWristTerminal({ root: document.querySelector('main') ?? document.body,
   getData: () => colonyWristData(wristDetail) });
 function onColonyState(event) {
@@ -60,6 +64,10 @@ function closeDrawer(returnFocus = true) {
   showDrawer(null);
   if (returnFocus) toggles.find(toggle => toggle.dataset.drawer === previous)?.focus({ preventScroll: true });
 }
+
+// DASHBOARD: release observer listeners and its timer on page teardown.
+listen(window, 'pagehide', event => { if (!event.persisted) dashboard.dispose(); });
+if (import.meta.hot) import.meta.hot.dispose(() => dashboard.dispose());
 
 for (const toggle of toggles) listen(toggle, 'click', () => {
   showDrawer(activeDrawer === toggle.dataset.drawer ? null : toggle.dataset.drawer);
