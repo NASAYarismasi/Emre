@@ -6,6 +6,9 @@
 |---|---|---|---|---|
 | İhan'ın tesisleri eklendikten sonra | 3.059 | 2,49 M | 20,4 | 19,0 |
 | Statik parçalar birleştirildikten sonra (2026-11-14) | **987** | 2,50 M | **5,5** | **13,8** |
+| İhan ed79956: sera kamerası, kablolar ve inverterlerle (2026-11-15) | **986** | 2,42 M | 7,7 | 19,5 |
+
+2026-11-15 kontrolü: Chromium / `--use-gl=angle`, 1440×900, piksel oranı 1. Sekiz kamera 74–986 çizim çağrısı; ilk FPS görünümü 1.021. Ölçümler `docs/screenshots/ihan-merge-performance.json` ve görüntülerin yanındaki JSON dosyalarında. CPU/GPU alanları mevcut gözlem kancasının anlık değerleridir; sabit FPS garantisi veya ayrıntılı GPU profili değildir. Güneş masalarının instancing'i korundu; yeni kablo/kabinler `batchStaticLeaves` ile birleştirildi. Hareketli şalter ile hava kilidi kapıları canlı kalır.
 
 ## Yapılanlar
 - **Statik parçaları birleştirme:** `findAnimatedObjects` ve `batchStaticLeaves` (`src/colony/scene/static-model.mjs`).

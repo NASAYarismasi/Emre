@@ -95,7 +95,7 @@ export function createFirstPerson(canvas, camera, { onMode, onAim, interact, acc
   }
   return {
     get active() { return active },
-    get telemetry() { return {x:camera.position.x,y:camera.position.y,z:camera.position.z,grounded:vertical.grounded} },
+    get telemetry() { return {x:camera.position.x,y:camera.position.y,z:camera.position.z,yaw:look.y,pitch:look.x,grounded:vertical.grounded} },
     setActive, respawn, teleport: lookFrom,
     update(delta, updateAim = true) {
       if (!active) return

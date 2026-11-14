@@ -17,7 +17,7 @@ describe('Perseverance surface operations', () => {
       expect(s.speedMps).toBeLessThanOrEqual(ROVER_MAX_SPEED_MPS + 1e-12)
       expect(d).toBeLessThanOrEqual(ROVER_MAX_SPEED_MPS * .1 + 1e-12)
     }
-    expect(s.mode).toBe('parked'); expect(s.x).toBeCloseTo(25, 6); expect(s.z).toBeCloseTo(26, 6)
+    expect(s.mode).toBe('parked'); expect(s.x).toBeCloseTo(ROVER_STATIONS.find(p => p.id === 'delta').x, 6); expect(s.z).toBeCloseTo(ROVER_STATIONS.find(p => p.id === 'delta').z, 6)
     expect(s.odometerM).toBeCloseTo(travelled, 8)
   })
   it('routes every station pair and base around every dome, lander and facility', () => {
