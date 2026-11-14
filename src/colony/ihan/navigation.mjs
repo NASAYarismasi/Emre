@@ -14,7 +14,9 @@ export function createOvaNavigation(world) {
         message:inside ? 'İç mekân · Diğer kubbelere yan tünellerden geç. E: hava kilidinden çık.' : 'Dış ortam · E ile hava kilidinden gir.'};
     },
     collides(x,z) {
-      if (inside) return !world.isInsideFloor(x,z);
+      // SAMET-HAB: room furniture/partitions include suited-body clearance.
+      if (inside) return !world.isInsideFloor(x,z) || world.indoorObstacles.some(box =>
+        x>box.min.x-.22 && x<box.max.x+.22 && z>box.min.z-.22 && z<box.max.z+.22);
       return Math.abs(x)>170 || Math.abs(z)>170 || world.isHabitatBlocked(x,z) || world.obstacles.some(box =>
         x>box.min.x && x<box.max.x && z>box.min.z && z<box.max.z);
     },
