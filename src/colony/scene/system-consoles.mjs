@@ -3,11 +3,20 @@
 // feed İhan's stepAir/stepWater through src/sim/colonyLifeSupport.js. Running units also show effects:
 // exhaust from the air-plant fans, dust and ice chips at the water-plant drill, mist over the grow beds.
 import * as T from 'three'
+import { roverReadouts } from './rover.mjs' // ROVER
 
 const n = (v, d = 2) => Number.isFinite(v) ? v.toLocaleString('tr-TR', { maximumFractionDigits: d, minimumFractionDigits: d }) : '—'
 const STATE = { on: ['ÇALIŞIYOR', '#7ce0c3'], idle: ['BEKLEMEDE', '#e7b25c'], off: ['KAPALI', '#e06c5a'] }
+const STATE_COLORS = Object.fromEntries(Object.entries(STATE).map(([key, value]) => [key, new T.Color(value[1])])) // ROVER: reuse lamp colours, no frame allocations.
 
 export const SYSTEMS = {
+  // ROVER: registered by the scene host; shares the facility computer and E interaction.
+  rover: {
+    title: 'Perseverance · Rover bilgisayarı', prompt: 'E · Rover bilgisayarı', controls: [],
+    status: t => t.rover.mode === 'parked' ? 'idle' : 'on',
+    readouts: t => roverReadouts(t.rover),
+    note: 'NASA/JPL: en çok 0,042 m/sn; MMRTG başlangıç gücü ≈110 W; iki 43 Ah batarya; 43 tüp (5 tanık). [ / ] ile yüzey zamanını hızlandır. Rotalar, enerji yükleri, işlem süreleri ve bilim verileri eğitsel oyun varsayımlarıdır; gerçek Jezero ölçümleri değildir. SHERLOC adayı yaşam kanıtı sayılmaz.',
+  },
   air: {
     title: 'Hava tesisi · O₂ üretimi ve CO₂ temizleme', prompt: 'E · Hava tesisi bilgisayarı',
     status: t => !t.controls.air.fans ? 'off' : t.air.producer ? 'on' : 'idle',
@@ -136,12 +145,15 @@ function makeEmitter(scene, { count, size, color, additive, spawn, velocity, lif
 
 export function createSystemConsoles({ scene, heightAt, placements, emitters, getTelemetry, setControl }) {
   const consoles = {}
-  for (const [id, at] of Object.entries(placements)) {
+  let rover = null // ROVER
+  const readTelemetry = () => { const t = getTelemetry(); if (rover) t.rover = rover.telemetry; return t } // ROVER
+  function addConsole(id, at) { // ROVER: also used for the rover parking computer.
     const screen = makeScreen(), { group, lamp } = makeConsole(screen)
     group.position.set(at.x, heightAt(at.x, at.z), at.z); group.rotation.y = at.yaw ?? 0
     scene.add(group)
     consoles[id] = { id, at, group, lamp, screen }
   }
+  for (const [id, at] of Object.entries(placements)) addConsole(id, at) // ROVER
   const rand = () => Math.random() - .5
   const effects = {
     air: makeEmitter(scene, { count: 140, size: .55, color: 0x5a5148, additive: true, life: 3.2,
@@ -164,15 +176,18 @@ export function createSystemConsoles({ scene, heightAt, placements, emitters, ge
   panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'false'); panel.tabIndex = -1
   panel.innerHTML = `<header><div><span class="sc-eyebrow">TESİS BİLGİSAYARI</span><h2></h2></div>
     <button type="button" class="sc-close" aria-label="Bilgisayarı kapat">×</button></header>
-    <div class="sc-status"></div><dl class="sc-readouts"></dl><div class="sc-controls"></div><p class="sc-note"></p>
+    <div class="sc-status"></div><dl class="sc-readouts"></dl><div class="sc-controls"></div><div class="sc-results"></div><p class="sc-note"></p>
     <p class="sc-hint">Esc · kapat</p>`
   ;(document.querySelector('main') ?? document.body).append(panel)
   let open = null, lastDraw = -1, time = 0
+  let roverMode = null, roverMeasurements = -1, roverSamples = -1 // ROVER: immediate completion updates, including advanceTime().
   const abort = new AbortController(), on = (el, type, fn, opts = {}) => el.addEventListener(type, fn, { ...opts, signal: abort.signal })
 
   function renderControls() {
-    const sys = SYSTEMS[open], t = getTelemetry(), box = panel.querySelector('.sc-controls')
+    const sys = SYSTEMS[open], t = readTelemetry(), box = panel.querySelector('.sc-controls') // ROVER
     box.replaceChildren()
+    box.classList.remove('rover-controls') // ROVER
+    if (open === 'rover') { rover.renderControls(box, on); return } // ROVER
     if (sys.modes) {
       const [system, key, options] = sys.modes, row = document.createElement('div'); row.className = 'sc-modes'
       row.append(Object.assign(document.createElement('span'), { textContent: 'LED büyüme ışığı' }))
@@ -194,13 +209,17 @@ export function createSystemConsoles({ scene, heightAt, placements, emitters, ge
     }
   }
   function renderReadouts() {
-    const sys = SYSTEMS[open], t = getTelemetry(), [label, color] = STATE[sys.status(t)]
+    const sys = SYSTEMS[open], t = readTelemetry(), [label, color] = STATE[sys.status(t)] // ROVER
     const status = panel.querySelector('.sc-status'); status.textContent = '● ' + label; status.style.color = color
     panel.querySelector('.sc-readouts').replaceChildren(...sys.readouts(t).flatMap(([k, v]) =>
       [Object.assign(document.createElement('dt'), { textContent: k }), Object.assign(document.createElement('dd'), { textContent: v })]))
+    if (open === 'rover') rover.renderResults(panel.querySelector('.sc-results')) // ROVER
   }
   function show(id) {
+    if (!consoles[id]) return // ROVER
     open = id
+    panel.querySelector('.sc-results').replaceChildren(); panel.querySelector('.sc-results').className = 'sc-results' // ROVER
+    panel.querySelector('.sc-eyebrow').textContent = id === 'rover' ? 'MARS 2020 / YÜZEY BİLİMİ' : 'TESİS BİLGİSAYARI' // ROVER
     if (document.pointerLockElement) document.exitPointerLock()
     panel.querySelector('h2').textContent = SYSTEMS[id].title
     panel.querySelector('.sc-note').textContent = SYSTEMS[id].note
@@ -222,6 +241,7 @@ export function createSystemConsoles({ scene, heightAt, placements, emitters, ge
     return null
   }
   return {
+    registerRover(adapter) { rover = adapter; addConsole('rover', { x: 3.2, z: 17.6, yaw: .35 }) }, // ROVER
     get open() { return open },
     prompt: camera => nearest(camera) ? SYSTEMS[nearest(camera).id].prompt : '',
     interact(camera) { const c = nearest(camera); if (!c) return false; show(c.id); return true },
@@ -229,15 +249,20 @@ export function createSystemConsoles({ scene, heightAt, placements, emitters, ge
     blocks: (x, z, hx = .3, hz = .3) => Object.values(consoles).some(c => Math.abs(x - c.group.position.x) < .35 + hx && Math.abs(z - c.group.position.z) < .3 + hz),
     update(dt) {
       time += dt
-      const t = getTelemetry()
+      const t = readTelemetry() // ROVER
       effects.air.update(dt, Boolean(t.air.producer || t.air.scrubber))
       effects.water.update(dt, Boolean(t.water.extractor))
       effects.ice.update(dt, Boolean(t.water.extractor))
       effects.mist.update(dt, Boolean(t.greenhouse.pumpOn))
       for (const c of Object.values(consoles)) {
-        const state = SYSTEMS[c.id].status(t), color = new T.Color(STATE[state][1])
+        const state = SYSTEMS[c.id].status(t), color = STATE_COLORS[state] // ROVER
         c.lamp.material.color.copy(color); c.lamp.material.emissive.copy(color)
         c.lamp.material.emissiveIntensity = state === 'on' ? 2 : 1 + Math.sin(time * 6) // idle/off lamps blink
+      }
+      // ROVER: deterministic stepping must leave the final control state immediately usable.
+      if (open === 'rover' && (roverMode !== t.rover.mode || roverMeasurements !== t.rover.measurements.length || roverSamples !== t.rover.samples.length)) {
+        roverMode = t.rover.mode; roverMeasurements = t.rover.measurements.length; roverSamples = t.rover.samples.length
+        renderReadouts()
       }
       if (time - lastDraw > .25) {
         lastDraw = time
