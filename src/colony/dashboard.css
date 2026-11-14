@@ -69,6 +69,7 @@
 .dash-map .map-greenhouse { fill:#224b40; stroke:#8ac6aa; }
 .dash-map .map-plant { fill:#344442; stroke:var(--amber); }
 .dash-map .map-lander { fill:#45473f; stroke:#c1b49b; }
+.dash-map .map-comms { fill:#45473f; stroke:#e7795b; }
 .dash-map .map-crew { fill:var(--mint); stroke:#c8f3e6; }
 .dash-map .map-player { fill:#e6f9f5; stroke:var(--mint); }
 .dash-map .map-rover { fill:var(--amber); stroke:#f7e0af; }

@@ -1,6 +1,7 @@
 /** Perseverance surface operations. Pure, deterministic; distances/time in SI.
  * batteryKWh is the requested dashboard interchange unit (energy integration uses watts/seconds).
  */
+import { ROVER_PARK, FACILITY_KEEPOUTS, PAD_KEEPOUTS } from '../data/colonyLayout.js'
 // NASA/JPL: 152 m/h on hard flat ground, rounded down to 0.042 m/s.
 // https://science.nasa.gov/mission/mars-2020-perseverance/rover-components/
 export const ROVER_MAX_SPEED_MPS = .042
@@ -31,7 +32,7 @@ export const ROVER_TUBES = 43
 export const ROVER_WITNESS_TUBES = 5
 export const ROVER_INSTRUMENTS = ['SuperCam', 'PIXL', 'SHERLOC', 'MEDA', 'RIMFAX']
 // GAME ASSUMPTION: compact teaching sites, not surveyed Jezero locations; all synthetic values below.
-export const ROVER_HOME = { id: 'base', name: 'Üs parkı', x: 5.75, z: 14.5 }
+export const ROVER_HOME = { id: 'base', name: 'Üs parkı', ...ROVER_PARK }
 export const ROVER_STATIONS = [
   { id: 'seitah', name: 'Séítah · olivin', x: -26, z: 24, mineral: 'Olivin + piroksen; zayıf karbonat', elements: [17, 18, 20, 4, .4] },
   { id: 'delta', name: 'Delta önü', x: 33, z: 30, mineral: 'Karbonat + silikat; suyla değişim izi', elements: [10, 7, 24, 12, 1.8] },
@@ -39,8 +40,7 @@ export const ROVER_STATIONS = [
   { id: 'layers', name: 'Delta katmanları', x: 42, z: -38, mineral: 'İnce taneli silikat + karbonat', elements: [12, 9, 25, 8, 1.1] },
 ]
 // GAME ASSUMPTION: crew keep-outs enlarged for rover footprint; centre dome + tunnels, lander, facilities.
-export const ROVER_OBSTACLES = [[0, 0, 15.3], [-18, -12, 8], [19, 26, 11.3], [19, 6, 4.6], [64, -26, 4.8],
-  [-57, 46, 31]] // single greenhouse at İhan's (19,25) site; solar field reserved too
+export const ROVER_OBSTACLES = [...FACILITY_KEEPOUTS, ...PAD_KEEPOUTS.map(([x,z,r])=>[x,z,r+1.5])]
 const distance = (a, b) => Math.hypot(b.x - a.x, b.z - a.z)
 export function roverSegmentClear(a, b, obstacles = ROVER_OBSTACLES) {
   const dx = b.x - a.x, dz = b.z - a.z, d2 = dx * dx + dz * dz

@@ -78,7 +78,9 @@ describe('dashboard read-only telemetry projection', () => {
     expect(markers.filter(p => p.kind === 'crew')).toHaveLength(1);
     expect(markers.find(p => p.kind === 'player')).toMatchObject({ x: 2, z: 3 });
     expect(markers.find(p => p.kind === 'rover')).toMatchObject({ x: 50, z: 60 });
-    expect(markers.filter(p => p.fixed)).toHaveLength(8);
+    expect(markers.filter(p => p.fixed)).toHaveLength(9);
+    expect(markers.find(p => p.kind === 'lander')).toMatchObject({ x: -16, z: -91 });
+    expect(markers.find(p => p.kind === 'comms')).toMatchObject({ x: -38, z: -27 });
   });
 });
 

@@ -3,6 +3,8 @@
 import * as T from "three";
 import { makeKit } from "./equipment-kit.mjs";
 import {addSolarFarm} from "./solar-farm.mjs";
+import { createCommsStation } from './comms-station.mjs';
+import { COMMS_PAD, PAD_KEEPOUTS, ARRIVAL_ROUTE } from '../../data/colonyLayout.js';
 export function getTerrainHeight(x, z) {
   return .09 * Math.sin(x * .054 + z * .025)
        + .07 * Math.sin(z * .067 - x * .034)
@@ -409,6 +411,14 @@ export function createOvaWorld(scene){
       if (rRnd() > .32+.68*patches) continue
       // Üssün oturduğu alanı boş bırak
       if (Math.hypot(x, z) < options.pad) continue
+      // Host layout: clear both prepared pads and the marked EVA corridor before scattering rocks.
+      if (PAD_KEEPOUTS.some(([px,pz,r])=>Math.hypot(x-px,z-pz)<r+2)) continue
+      if (ARRIVAL_ROUTE.some((b,i)=>{
+        if (!i) return false
+        const a=ARRIVAL_ROUTE[i-1],dx=b.x-a.x,dz=b.z-a.z
+        const t=T.MathUtils.clamp(((x-a.x)*dx+(z-a.z)*dz)/(dx*dx+dz*dz),0,1)
+        return Math.hypot(x-a.x-t*dx,z-a.z-t*dz)<3.5
+      })) continue
 
       const scale = options.minScale + Math.pow(rRnd(), 2.6) * (options.maxScale - options.minScale)
       dummy.position.set(x, getTerrainHeight(x, z) + scale * (0.51 * options.flat - options.bury), z)
@@ -477,24 +487,6 @@ export function createOvaWorld(scene){
   const colonyGroup = new T.Group()
   const baseObstacles = []
   const indoorObstacles = []
-
-  function placeBaseItem(object, x, z, yaw = 0) {
-    const y = getTerrainHeight(x, z)
-    object.position.set(x, y, z)
-    object.rotation.y = yaw
-    object.traverse(child => {
-      if (child.isMesh) {
-        child.castShadow = true
-        child.receiveShadow = true
-      }
-    })
-    colonyGroup.add(object)
-    
-    // Add collision bounding box for FPS
-    const box = new T.Box3().setFromObject(object).expandByScalar(0.4)
-    baseObstacles.push(box)
-    return object
-  }
 
   // Panelized weather covers, low service decks and recessed airlocks.
   const sand = new T.MeshStandardMaterial({vertexColors:true, roughness:.82})
@@ -753,37 +745,24 @@ export function createOvaWorld(scene){
     || (Math.abs(z)<1.46 && Math.abs(x)<9)
     || locks.some(lock=>Math.abs(x-lock.x)<1.14 && z>2.85 && z<5.34)
 
-  const mast = new T.Group()
-  const mastRod = new T.CylinderGeometry(.033,.044,1,8)
-  const guyWire = (start,end) => {
-    const direction = end.clone().sub(start)
-    const rod = mesh(mast,mastRod,steel,...start.clone().lerp(end,.5).toArray())
-    rod.scale.y = direction.length()
-    rod.quaternion.setFromUnitVectors(new T.Vector3(0,1,0),direction.normalize())
-  }
-  for (let bay=0;bay<8;bay++) for (const side of [-1,1]) {
-    guyWire(new T.Vector3(side*.26,bay,.0),new T.Vector3(side*.26,bay+1,.0))
-    guyWire(new T.Vector3(side*.26,bay,.0),new T.Vector3(-side*.26,bay+1,.0))
-  }
-  for (const dx of [-2.2,2.2]) {
-    const anchorY=getTerrainHeight(-14+dx,-1)-getTerrainHeight(-14,-1)
-    guyWire(new T.Vector3(dx,anchorY,0),new T.Vector3(0,6.5,0))
-    block(mast,.15,1,.26,seal,dx/4,7.1,.08)
-  }
-  mesh(mast,mastRod,steel,0,8.6,0).scale.y=1.4
-  placeBaseItem(mast,-14,-1)
+  // Host layout: standalone comms pad; cable geometry must not turn the whole route into a solid AABB.
+  const comms = createCommsStation(scene,getTerrainHeight)
+  baseObstacles.push(new T.Box3(new T.Vector3(COMMS_PAD.x-COMMS_PAD.radius,-1,COMMS_PAD.z-COMMS_PAD.radius),
+    new T.Vector3(COMMS_PAD.x+COMMS_PAD.radius,16,COMMS_PAD.z+COMMS_PAD.radius)))
   const solar = addSolarFarm(T, scene, getTerrainHeight, baseObstacles,{greenhouse:greenhouseSite,water:waterSite})
 
   scene.add(colonyGroup)
 
   terrainMesh.name='Ihan_plain'; colonyGroup.name='Ihan_pressurised_habitat';
   terrainMesh.userData.heightAt=getTerrainHeight;
-  return {solar, greenhouseSite, ground:terrainMesh,habitat:colonyGroup,obstacles:baseObstacles,indoorObstacles,locks,floorY,entryZ:6.65,
+  return {solar, comms, greenhouseSite, ground:terrainMesh,habitat:colonyGroup,obstacles:baseObstacles,indoorObstacles,locks,floorY,entryZ:6.65,
     isInsideFloor:insideZone,isHabitatBlocked:outsideObstacle,
     blocksFootprint(x,z,hx,hz){return centers.some(cx=>Math.abs(x-cx)<radius+hx && Math.abs(z)<radius+hz)
       || baseObstacles.some(b=>x+hx>b.min.x && x-hx<b.max.x && z+hz>b.min.z && z-hz<b.max.z)},
     views:{panorama:{position:[-2.2,getTerrainHeight(-2.2,28)+2,28],target:[0,floorY+2.35,1]},
       base:{position:[24,16,30],target:[4,1,0]},solar:{position:[solar.x0+30,solar.level+36,solar.z0+46],target:[solar.x0,solar.level,solar.z0]},
+      comms:{position:[-55,12,-48],target:[COMMS_PAD.x,7,COMMS_PAD.z]},
+      overview:{position:[104,125,-170],target:[-12,0,-20]},
       pad:{position:[29,35,35],target:[0,0,18]}},
     dispose(){solar.dispose();surfaceDetail.dispose();regolithPhoto.dispose()}
   };

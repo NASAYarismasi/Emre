@@ -2,6 +2,7 @@
 // with a label above the helmet saying what they are doing. Their task follows the role assigned in
 // İhan's colony rules (İnşaat / Bakım / Üretim); with no role they rotate through routine EVA chores.
 import * as T from 'three'
+import { PAD_KEEPOUTS } from '../../data/colonyLayout.js'
 
 // Approach points next to each installation (metres, scene coordinates). Work durations are
 // GAME ASSUMPTIONs for pacing; the chores themselves mirror real surface-ops concerns:
@@ -22,7 +23,7 @@ const ROLE_SITES = {
 const ROUTINE = ['greenhouse', 'solar', 'air', 'rover', 'water', 'pad']
 // GAME ASSUMPTION: keep-out circles (x, z, radius) for walking: the whole dome+tunnel complex as one circle (three
 // overlapping dome circles would send a detour from one dome into the next), lander, greenhouse, plants.
-const OBSTACLES = [[0, 0, 14.5], [-18, -12, 6.6], [19, 26, 9.2], [19, 6, 3], [64, -26, 3.2]]
+export const CREW_OBSTACLES = [[0, 0, 14.5], ...PAD_KEEPOUTS, [19, 26, 9.2], [19, 6, 3], [64, -26, 3.2]]
 const WALK = 1.0 // m/s, suit-limited EVA walking pace (Apollo EVA traverses ≈ 1 m/s)
 const STRIDE_HZ = .75 // steps per second per leg at 1 m/s; low gravity → long, slow strides
 
@@ -43,7 +44,7 @@ function swing(parts, arms, legsL, legsR) {
 export function planPath(a, b, depth = 0) {
   if (depth > 3) return [b]
   const dx = b.x - a.x, dz = b.z - a.z, length2 = dx * dx + dz * dz || 1
-  for (const [cx, cz, r] of OBSTACLES) {
+  for (const [cx, cz, r] of CREW_OBSTACLES) {
     const t = Math.max(0, Math.min(1, ((cx - a.x) * dx + (cz - a.z) * dz) / length2))
     const px = a.x + dx * t, pz = a.z + dz * t
     if (Math.hypot(px - cx, pz - cz) >= r || t <= 0 || t >= 1) continue
@@ -111,10 +112,11 @@ export function createCrewAgents({ crewModels, groundY }) {
           // The player's body follows the camera in FPS so that switching astronaut keeps continuity.
           if (fpsActive) { actor.position.set(camera.position.x, groundY(camera.position.x, camera.position.z), camera.position.z); agent.mode = 'idle'; agent.path = [] }
           label.set(name + ' · Sen', 'Kontrol sende')
-          label.sprite.visible = !fpsActive
+          label.sprite.visible = !fpsActive && actor.position.distanceTo(camera.position) < 45
           return
         }
-        label.sprite.visible = true
+        // GAME ASSUMPTION: nearby work labels only; long-distance banners hid the whole base from the arrival pad.
+        label.sprite.visible = actor.position.distanceTo(camera.position) < 45
         agent.phase += step
         if (agent.mode === 'idle' || (agent.mode === 'working' && (agent.timer -= step) <= 0)) {
           agent.site = nextSite(person.role, agent.site, index, agent.visit++)

@@ -16,6 +16,8 @@ import { createCrewAgents } from "./crew-npc.mjs"
 import { createRover } from './rover.mjs' // ROVER
 import { batchStaticModel, prepareSurfaceMaterials, batchStaticLeaves } from "./static-model.mjs"
 import { createMarsLander } from "../../render/marsLander.js"
+import { LANDER_PAD, LANDER_SPAWN, ARRIVAL_YAW, ROVER_PARK } from '../../data/colonyLayout.js'
+import { createLandingZone } from './landing-zone.mjs'
 import { cargoOptions, defaultManifest, planMission, cargoLimitKg, transitDays } from "../mars-gorev-plani.mjs"
 import { createSceneColony } from "./mission-start.mjs"
 import { materialNames, nodes, crops, recipes, levelOf, startWorkshop, recipeError,
@@ -94,10 +96,12 @@ function makeScene() {
   Object.assign(ova.views, lifeSupport.views)
   const tracks = createFootprints(scene, groundY)
   const crewLander = batchStaticModel(createMarsLander())
-  // Arrival apron north-west of the colony: the +Z hatch exits toward the pad.
-  crewLander.position.set(-18, groundY(-18, -12), -12)
-  crewLander.userData.radius = 7.5 // GAME ASSUMPTION: construction clearance around the landing legs.
+  // Host layout: compact teaching separation, not a plume/ejecta safety model (see colonyLayout.js).
+  crewLander.position.set(LANDER_PAD.x, groundY(LANDER_PAD.x, LANDER_PAD.z), LANDER_PAD.z)
+  crewLander.userData.radius = LANDER_PAD.radius // GAME ASSUMPTION: reserve the entire blast-swept apron for construction.
   scene.add(crewLander)
+  createLandingZone(scene, groundY)
+  ova.views.lander = { position: [LANDER_PAD.x+25, 15, LANDER_PAD.z+25], target: [LANDER_PAD.x, 4, LANDER_PAD.z] }
   const roofGeometry = new T.BoxGeometry(roofSize.x * 2, .15, roofSize.z * 2)
   const roofMaterial = new T.MeshStandardMaterial({ color: 0x747875, metalness: .35, roughness: .68 })
   const roofMark = new T.MeshBasicMaterial({ color: 0xdfab5d, polygonOffset: true, polygonOffsetFactor: -1 })
@@ -130,7 +134,7 @@ function makeScene() {
     deposits.add(rock)
   }
   const reference = new T.Group()
-  reference.position.set(5.75, .02, 14.5)
+  reference.position.set(ROVER_PARK.x, .02, ROVER_PARK.z)
   reference.rotation.y = -.6
   scene.add(objects, deposits, reference)
   // ROVER: moving NASA model, shared facility computer, and an overview that follows commands.
@@ -400,9 +404,9 @@ function makeScene() {
     },
   })
   // Crew arrives beside the +Z hatch ladder; avoid respawning inside the landing legs.
-  const hatchSpawn = new T.Vector3(crewLander.position.x, 0, crewLander.position.z + 9) // in front of the +Z ladder, clear of the diagonal legs
+  const hatchSpawn = new T.Vector3(LANDER_SPAWN.x, 0, LANDER_SPAWN.z) // +Z ladder, clear of the diagonal legs
   // Face İhan's dome complex (centred on the origin); camera forward is (-sin yaw, -cos yaw).
-  const arrivalYaw = Math.atan2(hatchSpawn.x, hatchSpawn.z)
+  const arrivalYaw = ARRIVAL_YAW
   crewActor(playerId).position.set(hatchSpawn.x, groundY(hatchSpawn.x, hatchSpawn.z), hatchSpawn.z)
   fps.respawn(hatchSpawn, arrivalYaw)
   canvas.addEventListener("pointermove", event => {
@@ -455,9 +459,10 @@ function makeScene() {
   }
   function tick(delta, updateAim = true) {
     environment.update(delta)
+    ova.comms.update(delta, environment.earthDirection)
     // ROVER: preserve orbit controls while following actual simulated rover displacement.
     const roverX = reference.position.x, roverY = reference.position.y, roverZ = reference.position.z
-    roverAgent.update(delta, environment.telemetry.warp)
+    roverAgent.update(delta, environment.telemetry.warp, camera)
     if (currentView === 'rover') {
       camera.position.x += reference.position.x - roverX; camera.position.y += reference.position.y - roverY; camera.position.z += reference.position.z - roverZ
       controls.target.x += reference.position.x - roverX; controls.target.y += reference.position.y - roverY; controls.target.z += reference.position.z - roverZ
@@ -486,6 +491,8 @@ function makeScene() {
     lifeSupport: lifeSupport.telemetry, // IHAN-SRC: deterministic observer contract
     crewAgents: crewAgents.telemetry,
     rover: roverAgent.telemetry, // ROVER: full SI science/sample contract for dashboard.
+    layout: { lander: { ...LANDER_PAD, y: crewLander.position.y }, hatchSpawn: LANDER_SPAWN, arrivalYaw,
+      comms: ova.comms.telemetry, roverPark: ROVER_PARK },
     placement: { selected: selected ?? null, preview: preview.visible, marker: marker.visible },
     rendering: { ...frameStats, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, pixelRatio: renderer.getPixelRatio() },
   })

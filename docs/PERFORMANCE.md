@@ -22,3 +22,7 @@
 
 ## Kalan
 - **Üçgen sayısı (~2,5 M):** NASA GLB'leri (Perseverance, InSight, ekip astronotu ×3) ve sera bitki örnekleri. Mesafeye göre basitleştirilmiş LOD sonraki adım.
+
+## LAYOUT kontrolü — 2026-11-15
+
+Ayrı haberleşme istasyonu ve uzak iniş alanıyla, Chromium `--use-gl=angle` / AMD Radeon D3D11 / 1440×900 / piksel oranı 1: ilk FPS **851**, kule gündüz **840**, iniş alanı **605**, bütün üs **854**, kule gece **885 draw call**. Yeni bir gerçek zamanlı ışık eklenmedi. Statik mast, gergiler, kablolar, ayak izleri ve bayraklar `batchStaticLeaves` kullanır; mafsallı çanak ve kırmızı emissive/sprite lamba canlıdır. Yeni uzak doğuşta kubbeleri örten sabit ekran boyutlu NPC/rover etiketleri yalnız yakından gösterilir. Beş ekran görüntüsü, GPU kimliği, tuşlarla rota/giriş/çıkış doğrulaması ve anlık CPU/GPU örnekleri: `screenshots/layout-performance.json`; yerleşim notları: [LAYOUT.md](LAYOUT.md). Anlık örnekler sabit FPS garantisi değildir.

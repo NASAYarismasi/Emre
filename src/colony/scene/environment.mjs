@@ -220,6 +220,8 @@ export function createEnvironment(scene, camera, canvas) {
   }
   updateLighting(); alignHUD()
   return {
+    // Same illustrative Earth direction as the night-sky marker; not an ephemeris.
+    get earthDirection() { return earth.position.clone().normalize() },
     get telemetry() { return {lmst:solar.lmst/3600,headlamp:lampOn,sunElevationDeg:solar.elevation*DEG,warp:warps[warpIndex],unixSeconds,storm,audio:audio.enabled} },
     setLifeSupport(value) { latestLifeSupport=value }, // IHAN-SRC
     setRover(value) { latestRover=value }, // ROVER

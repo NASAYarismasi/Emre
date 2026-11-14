@@ -4,6 +4,7 @@ import {createOvaWorld} from '../src/colony/ihan/crater-ecosystem.mjs';
 import {createOvaNavigation} from '../src/colony/ihan/navigation.mjs';
 import {calculateEclss} from '../src/colony/ihan/eclss.mjs';
 import {prepareOvaRover} from '../src/colony/ihan/assets.mjs';
+import { LANDER_PAD, COMMS_PAD } from '../src/data/colonyLayout.js';
 
 const context = () => ({
   createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),
@@ -51,11 +52,38 @@ describe('İhan Düz Ova world (real source ed79956)',()=>{
   });
   it('matches rendered ground triangles at the lander, pad, and solar field',()=>{
     const ray=new THREE.Raycaster(),down=new THREE.Vector3(0,-1,0);
-    for(const [x,z]of [[0,0],[-18,22],[30,30],[-57,46],[149,-133]]){
+    for(const [x,z]of [[0,0],[LANDER_PAD.x,LANDER_PAD.z],[COMMS_PAD.x,COMMS_PAD.z],[30,30],[-57,46],[149,-133]]){
       ray.set(new THREE.Vector3(x,100,z),down);
       // İhan's analytic height vs the rendered triangle: within 1 cm (walker feet never float/sink visibly).
       expect(Math.abs(world.ground.userData.heightAt(x,z)-ray.intersectObject(world.ground)[0].point.y)).toBeLessThan(.01);
     }
+  });
+  it('clears prepared pads of every rendered rock and building and retains the live beacon after batching',()=>{
+    for (const pad of [LANDER_PAD,COMMS_PAD]) {
+      for (const box of world.obstacles) {
+        if (pad===COMMS_PAD && box.min.x===pad.x-pad.radius) continue
+        const x=THREE.MathUtils.clamp(pad.x,box.min.x,box.max.x),z=THREE.MathUtils.clamp(pad.z,box.min.z,box.max.z)
+        expect(Math.hypot(x-pad.x,z-pad.z)).toBeGreaterThan(pad.radius)
+      }
+      scene.updateMatrixWorld(true)
+      for (const mesh of scene.children.filter(o=>o.isInstancedMesh)) {
+        mesh.geometry.computeBoundingBox()
+        for (let i=0;i<mesh.count;i++) {
+          const matrix=new THREE.Matrix4(); mesh.getMatrixAt(i,matrix)
+          const box=mesh.geometry.boundingBox.clone().applyMatrix4(matrix)
+          const x=THREE.MathUtils.clamp(pad.x,box.min.x,box.max.x),z=THREE.MathUtils.clamp(pad.z,box.min.z,box.max.z)
+          expect(Math.hypot(x-pad.x,z-pad.z)).toBeGreaterThan(pad.radius)
+        }
+      }
+    }
+    const beacon=world.comms.group.getObjectByName('Comms_red_obstruction_beacon')
+    expect(beacon).toBeTruthy(); expect(world.comms.telemetry.beaconOn).toBe(true)
+    world.comms.update(.5,new THREE.Vector3(0,1,0)); expect(beacon.material.emissiveIntensity).toBeLessThan(.1)
+    expect(world.comms.telemetry.direction).toEqual([0,1,0])
+    world.comms.update(1,new THREE.Vector3(0,-1,0)); expect(beacon.material.emissiveIntensity).toBeGreaterThan(5)
+    expect(world.comms.telemetry.direction[1]).toBeGreaterThan(.5) // Relay fallback stays above the horizon.
+    expect(world.blocksFootprint(COMMS_PAD.x,COMMS_PAD.z,1,1)).toBe(true)
+    expect(createOvaNavigation(world).collides(COMMS_PAD.x,COMMS_PAD.z)).toBe(true)
   });
   it('removes scene-refraction passes from shared rover lenses without changing the hierarchy',()=>{
     const rover=new THREE.Group(), lens=new THREE.MeshPhysicalMaterial({transmission:1});

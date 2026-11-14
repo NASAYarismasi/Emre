@@ -204,7 +204,7 @@ export function createRover({ scene, reference, heightAt, focus }) {
       box.append(note,actions,locate)
     },
     renderResults,
-    update(dt, warp) {
+    update(dt, warp, camera) {
       realTime += dt
       // GAME ASSUMPTION: fixed rover ×10 on top of colony warp. Every watt/second uses the same rover clock.
       const oldDistance=state.odometerM,oldHeading=state.heading,simDt=dt*warp*ROVER_TIME_COMPRESSION
@@ -225,7 +225,9 @@ export function createRover({ scene, reference, heightAt, focus }) {
         const target = state.target, desired = state.mode === 'analyzing' && target ? Math.atan2(target.x + 1 - state.x, target.z + 2 - state.z) - state.heading : 0
         mast.rotation.y += Math.atan2(Math.sin(desired - mast.rotation.y), Math.cos(desired - mast.rotation.y)) * Math.min(1, dt * 2)
       }
-      label.sprite.position.set(state.x, reference.position.y + 3.1, state.z); label.sprite.visible = Boolean(model) && reference.visible
+      label.sprite.position.set(state.x, reference.position.y + 3.1, state.z)
+      // GAME ASSUMPTION: keep distant banners from covering the base in the new arrival/overview views.
+      label.sprite.visible = Boolean(model) && reference.visible && (!camera || reference.position.distanceTo(camera.position) < 45)
       if(state.mode!==lastLabelMode || dt===0) {label.draw(state);lastLabelMode=state.mode}
       flash.visible = Boolean(model) && reference.visible && state.mode === 'analyzing' && state.instrumentQueue[0] === 'SuperCam' && state.elapsedS % .6 < .06
       if (flash.visible) { if (mast) mast.getWorldPosition(flash.position); else flash.position.set(state.x, reference.position.y + 2, state.z) }

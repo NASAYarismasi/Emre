@@ -75,6 +75,9 @@ Bulut alfa haritası, scrub/beton/folyo/kum dokuları, LC-39B geometrisi, Mars a
 Koloni kuralları, kaynak miktarları, tarım ve atölye değerleri eğitsel oyun birimleridir (İhan, `MARS-ENTEGRASYON.md`). Uçuştan koloniye birim dönüşümü: `src/sim/landingPayload.js` (1 birim = bir astronotun bir sollük ihtiyacı, NASA BVAD oranlarıyla).
 
 <!-- SYNC: procedural surface provenance; no external imagery added. -->
+<!-- LAYOUT: the surface comms mast, gimbal dish, guy anchors, cable jackets, soft beacon texture,
+     blast-swept decal, footpad prints and EVA waymarkers are original procedural project artwork.
+     No downloaded model, photograph, font, or third-party texture was added for this layout pass. -->
 `src/colony/scene/crater-terrain.mjs` ve `regolith-detail.mjs`, İhan’ın `kaynak/src/crater-ecosystem.mjs` içindeki prosedürel krater profilleri ve 512² regolit detay üreticisinden uyarlanmıştır. Merkezde 60 m çaplı düz oyun sahası, dışta yassı taşlar ve seyreltilmiş instanced çakıl halısı vardır. Yerel yükseklikler ölçülmüş Jezero DEM’i değildir. Mevcut MOLA tabanlı bölgesel ufuk ve YÜZEY’in Mars24 ortamı korunur; HiRISE ortofotosu veya ikinci gökyüzü/ışık sistemi eklenmedi.
 
 ## Düz Ova entegrasyonu (OVA, 2026-11-14)

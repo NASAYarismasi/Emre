@@ -1,6 +1,7 @@
 import { colonyReport, modules, roles } from './mars-koloni.mjs';
 import { LIFE_SOL_SECONDS } from '../sim/colonyLifeSupport.js';
 import './dashboard.css';
+import { LANDER_PAD, COMMS_PAD, ARRIVAL_ROUTE, COMMS_CABLE_ROUTE } from '../data/colonyLayout.js';
 
 const finite = value => typeof value === 'number' && Number.isFinite(value);
 const numeric = value => finite(value) ? value : null;
@@ -128,7 +129,8 @@ function trend(history, key) {
 const BASE_PLAN = [
   { x: -9, z: 0, kind: 'dome', label: 'YAŞAM' }, { x: 0, z: 0, kind: 'dome' }, { x: 9, z: 0, kind: 'dome' },
   { x: 19, z: 25, kind: 'greenhouse', label: 'SERA' }, { x: 19, z: 6, kind: 'plant', label: 'HAVA' },
-  { x: 64, z: -26, kind: 'plant', label: 'SU / BUZ' }, { x: -18, z: -12, kind: 'lander', label: 'İNİŞ ARACI' },
+  { x: 64, z: -26, kind: 'plant', label: 'SU / BUZ' }, { ...LANDER_PAD, kind: 'lander', label: 'İNİŞ ARACI' },
+  { ...COMMS_PAD, kind: 'comms', label: 'BAZ İSTASYONU' },
   { x: -57, z: 46, kind: 'solar', label: 'GÜNEŞ TARLASI' },
 ];
 
@@ -151,6 +153,8 @@ function baseMap(snapshot, roverOnly = false) {
     const x = p.kind === 'rover' ? Math.max(9, Math.min(mapW-9,p.x-minX)) : p.x-minX, z = p.kind === 'rover' ? Math.max(17,Math.min(mapH-24,p.z-minZ)) : p.z-minZ; // ROVER2: edge clamp preserves live bearing.
     if(p.kind === 'rover') return `<g class="map-rover"><title>Rover · X ${f(p.x)} / Z ${f(p.z)} m</title><circle cx="${x}" cy="${z}" r="2.6"/><text x="${x}" y="${z+12}" text-anchor="${x>mapW/2?'end':'start'}" style="text-anchor:${x>mapW/2?'end':'start'};font-size:${mapW/(roverOnly?24:35)}px;fill:#f0c278;stroke:none">ROVER · ${f(snapshot.rover.distanceFromBaseM)} m</text></g>`; // ROVER2: readable distance stays visible on both maps.
     const shape = p.kind === 'dome' ? `<circle cx="${x}" cy="${z}" r="4.3"/>`
+      : p.kind === 'lander' ? `<circle cx="${x}" cy="${z}" r="${p.radius}" fill-opacity=".25"/><rect x="${x-4}" y="${z-4}" width="8" height="8"/>`
+      : p.kind === 'comms' ? `<circle cx="${x}" cy="${z}" r="${p.radius}" fill-opacity=".25"/><path d="M${x-2.5} ${z+3}l2.5-6 2.5 6z"/>`
       : p.kind === 'solar' ? `<rect x="${x - 20}" y="${z - 24}" width="40" height="48" rx="1"/><path d="M${x-20} ${z-8}h40m-40 16h40m-27-32v48m14-48v48"/>`
       : p.kind === 'greenhouse' ? `<rect x="${x-5}" y="${z-6}" width="10" height="12" rx="3"/>`
       : p.kind === 'player' ? `<path d="M${x} ${z-3.4}l2.5 6-2.5-1-2.5 1z"/>`
@@ -158,7 +162,9 @@ function baseMap(snapshot, roverOnly = false) {
       : `<rect x="${x-2.5}" y="${z-2.5}" width="5" height="5" rx=".6"/>`;
     return `<g class="map-${p.kind}"><title>${escape(p.label ?? 'Habitat')} · X ${f(p.x)} / Z ${f(p.z)} m</title>${shape}${p.label && !roverOnly ? `<text x="${x}" y="${z + (p.kind === 'solar' ? 29 : p.kind === 'lander' ? -7 : p.label === 'A3' ? 12 : 8)}">${escape(p.label)}</text>` : ''}</g>`;
   }).join('');
-  return `<svg class="dash-map ${roverOnly ? 'dash-rover-map' : ''}" viewBox="0 0 ${mapW} ${mapH}" role="img" aria-label="Düz Ova üs planı; kuzey yukarı, doğu sağda"><defs><pattern id="dash-grid-${roverOnly}" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="#93d9c7" stroke-opacity=".09" stroke-width=".25"/></pattern></defs><rect width="100%" height="100%" fill="url(#dash-grid-${roverOnly})"/><path class="dash-map-route" d="M${-57-minX} ${46-minZ}L${-18-minX} ${-12-minZ}L${19-minX} ${25-minZ}L${64-minX} ${-26-minZ}"/>${shapes}<g class="dash-map-scale"><path d="M8 ${mapH-10}h20m-20-2v4m20-4v4"/><text x="18" y="${mapH-14}">20 m</text><text x="${mapW-10}" y="12">↑ K</text></g></svg>`;
+  const routePath = points => points.map((p,i)=>`${i?'L':'M'}${p.x-minX} ${p.z-minZ}`).join('');
+  const routes = [routePath(ARRIVAL_ROUTE), routePath(COMMS_CABLE_ROUTE.map(([x,z])=>({x,z})))].join('');
+  return `<svg class="dash-map ${roverOnly ? 'dash-rover-map' : ''}" viewBox="0 0 ${mapW} ${mapH}" role="img" aria-label="Düz Ova üs planı; kuzey yukarı, doğu sağda"><defs><pattern id="dash-grid-${roverOnly}" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="#93d9c7" stroke-opacity=".09" stroke-width=".25"/></pattern></defs><rect width="100%" height="100%" fill="url(#dash-grid-${roverOnly})"/><path class="dash-map-route" d="${routes}"/>${shapes}<g class="dash-map-scale"><path d="M8 ${mapH-10}h20m-20-2v4m20-4v4"/><text x="18" y="${mapH-14}">20 m</text><text x="${mapW-10}" y="12">↑ K</text></g></svg>`;
 }
 
 function timelineChart(rows) {
