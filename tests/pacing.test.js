@@ -74,13 +74,13 @@ it('runs the headless director with the actual warp guard and measures feasible 
   expect(mission.state.phase).toBe('LANDED');
   expect(mission.getTelemetry().touchdownSpeed).toBeLessThan(2.5);
   for(const event of eventRates)expect(event.rate, event.type).toBeLessThan(1.15);
-  // Existing public API caps: even cruise + powered burns alone exceed 8 min,
-  // before ascent, coast or EDL. Do not fabricate a passing 7–9 minute claim.
-  const lowerBound=plan.phases.CRUISE/100000+(plan.phases.TMI_BURN+plan.phases.MOI_BURN)/10;
-  expect(lowerBound).toBeGreaterThan(510);
-  expect(seconds).toBeGreaterThan(9*60);
-  expect(seconds).toBeLessThan(22*60);
-  expect(chapter2).toBeGreaterThan(3*60);
+  // Vacuum burns ×50 and analytic cruise ×400000: cruise + burns now fit in ~2 min.
+  const lowerBound=plan.phases.CRUISE/PACING.cruise+(plan.phases.TMI_BURN+plan.phases.MOI_BURN)/PACING.burn;
+  expect(lowerBound).toBeLessThan(180);
+  console.log('PACING_TOTAL_S', Math.round(seconds), 'CHAPTER2_S', Math.round(chapter2), JSON.stringify(Object.fromEntries(Object.entries(durations).map(([k,v])=>[k,Math.round(v)]))));
+  expect(seconds).toBeGreaterThan(4*60);
+  expect(seconds).toBeLessThan(9.5*60);
+  expect(chapter2).toBeGreaterThan(90);
   expect(chapter2).toBeLessThan(7*60);
   console.info('PACING measured real seconds',JSON.stringify({total:seconds,chapter2,phases:durations,eventRates}));
 },20000);

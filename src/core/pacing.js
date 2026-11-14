@@ -2,7 +2,7 @@ import { createMission } from '../sim/mission.js';
 
 // GAME ASSUMPTION: presentation choices, never flight dynamics or event triggers.
 export const PACING = Object.freeze({ easingSeconds: 2, logSlope: 1.8, eventLead: 4, eventHold: 3,
-  ascent: 4, burn: 10, coast: 600, cruise: 100000, edl: 4, orbitDwell: 12 });
+  ascent: 6, burn: 50, coast: 600, cruise: 400000, edl: 8, orbitDwell: 12 });
 
 /** Compute a deterministic reference through public flight commands. Event times are
  * predictions only; the live mission remains the authority for every transition.

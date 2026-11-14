@@ -15,7 +15,7 @@ it('allows every requested warp only in the allowed flight environment', () => {
   const state = { engineFiring: false, inAtmosphere: false }, step = vi.fn();
   const loop = createLoop({ step, getState: () => state });
   for (const warp of WARPS) expect(loop.setWarp(warp)).toBe(true);
-  state.engineFiring = true; expect(loop.setWarp(50)).toBe(false); expect(loop.setWarp(10)).toBe(true);
+  state.engineFiring = true; expect(loop.setWarp(1000)).toBe(false); expect(loop.setWarp(50)).toBe(true); expect(loop.setWarp(10)).toBe(true); // vacuum burn ≤ ×50
   state.engineFiring = false; state.inAtmosphere = true; expect(loop.setWarp(1000)).toBe(false);
   expect(loop.setWarp(3)).toBe(false);
 });

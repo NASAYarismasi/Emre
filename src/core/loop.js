@@ -1,7 +1,7 @@
 export const SIM_DT = 1 / 50;
-export const WARPS = Object.freeze([1, 2, 5, 10, 50, 1000, 100000]);
-export const canWarp = (warp, state) => WARPS.includes(warp) && (warp <= 10 || (state.engineFiring === false && state.inAtmosphere === false));
-export const canPlaybackRate = (rate, state) => Number.isFinite(rate) && rate >= 1 && rate <= WARPS.at(-1) && (rate <= 10 || (state.engineFiring === false && state.inAtmosphere === false));
+export const WARPS = Object.freeze([1, 2, 5, 10, 50, 1000, 100000, 400000]);
+export const canWarp = (warp, state) => WARPS.includes(warp) && (warp <= 10 || (state.inAtmosphere === false && (state.engineFiring === false || warp <= 50)));
+export const canPlaybackRate = (rate, state) => Number.isFinite(rate) && rate >= 1 && rate <= WARPS.at(-1) && (rate <= 10 || (state.inAtmosphere === false && (state.engineFiring === false || rate <= 50)));
 /** Fixed-step accumulator. A bounded work budget retains backlog; simulation time is never discarded.
  * Mission analytical coasts can optionally batch fixed ticks through advanceCoast() at high warp.
  */

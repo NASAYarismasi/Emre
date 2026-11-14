@@ -9,7 +9,8 @@ import { buildLandingPayload } from './landingPayload.js';
 import { clamp } from './numerics.js';
 
 export const MISSION_PHASES = Object.freeze(['PRELAUNCH', 'ASCENT', 'PARKING_ORBIT', 'TMI_BURN', 'CRUISE', 'MOI_BURN', 'MARS_ORBIT', 'DEORBIT', 'EDL', 'LANDED', 'FAILED']);
-export const ALLOWED_WARPS = Object.freeze([1, 2, 5, 10, 50, 1000, 100000]);
+// 400000: cruise is propagated analytically (advanceCoast), so the playback director can show 259 days in ~1 min.
+export const ALLOWED_WARPS = Object.freeze([1, 2, 5, 10, 50, 1000, 100000, 400000]);
 
 /** Consumables are gross metabolic demand without recycling, SI kg. Returns actual supported seconds. */
 export function consumeSupplies(state, seconds) {
@@ -149,7 +150,9 @@ export function createMission({ crewCount = 3, supplyDuration = 320 * DAY, suppl
       cruiseProgress: state.cruiseTime / state.transfer.duration, heliocentric: heliocentricAt(state.cruiseTime, state.transfer),
       landingPayload: state.phase === 'LANDED' ? buildLandingPayload(state) : null };
   }
-  function canSetWarp(warp) { const t = getTelemetry(); return ALLOWED_WARPS.includes(warp) && (warp <= 10 || (!t.engineFiring && !t.inAtmosphere)); }
+  // Fixed-timestep integration keeps physics identical at any warp; the guard only bounds steps per frame.
+  // Vacuum burns (TMI/MOI) may run at ×50; anything in the atmosphere stays ≤ ×10.
+  function canSetWarp(warp) { const t = getTelemetry(); return ALLOWED_WARPS.includes(warp) && (warp <= 10 || (!t.inAtmosphere && (!t.engineFiring || warp <= 50))); }
   return { state, step, advanceCoast, getTelemetry,
     launch() { if (state.phase !== 'PRELAUNCH') return false; ascent.launch(); transition('ASCENT'); return true; },
     setThrottle(value) {
