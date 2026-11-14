@@ -37,11 +37,24 @@ describe('dashboard read-only telemetry projection', () => {
     const s = mapDashboardTelemetry();
     expect(s.connected).toBe(false); expect(s.rover).toBeNull();
     expect(s.oxygenKg).toBeNull(); expect(s.power.used).toBeNull();
+    expect(s.power.batteryKWh).toBeNull(); expect(s.power.solarKW).toBeNull();
+    expect(s.power.lines.every(l => l.enabled === undefined)).toBe(true);
     expect(s.supplies.every(r => r.stock === null && r.sols === null)).toBe(true);
     expect(s.lamps.every(l => l.status === 'unknown')).toBe(true);
     const t = fake(); t.state.crew.forEach(p => { p.health = 0; });
     expect(mapDashboardTelemetry(t).report.status).toBe('failed');
     expect(mapDashboardTelemetry(t).supplies[0].sols).toBeNull();
+  });
+  it('projects physical generation, storage, all inverter switches and per-load power read-only', () => {
+    const t = fake();
+    t.lifeSupport.power = { solarKW: 20, batteryKWh: 90, batteryPercent: 50,
+      directKW: 4, storageKW: 16, ledKW: 3.36528, drillKW: 2,
+      switches: { main: true, batterySupport: false, inv1: false, inv2: true } };
+    const before = structuredClone(t), p = mapDashboardTelemetry(t).power;
+    expect(p).toMatchObject({ solarKW: 20, batteryKWh: 90, batteryPercent: 50, ledKW: 3.36528, drillKW: 2, main: true, batterySupport: false });
+    expect(p.lines.slice(0, 2)).toEqual([{ id: 1, enabled: false }, { id: 2, enabled: true }]);
+    expect(t).toEqual(before);
+    expect(mapBaseMarkers(mapDashboardTelemetry(t)).find(m => m.kind === 'greenhouse')).toMatchObject({ x: 19, z: 25 });
   });
   it('uses the same success and failure criteria as the colony report', () => {
     const t = fake(); t.state.crew.forEach(p => { p.health = 100; });

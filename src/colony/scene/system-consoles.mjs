@@ -10,6 +10,25 @@ const STATE = { on: ['ÇALIŞIYOR', '#7ce0c3'], idle: ['BEKLEMEDE', '#e7b25c'], 
 const STATE_COLORS = Object.fromEntries(Object.entries(STATE).map(([key, value]) => [key, new T.Color(value[1])])) // ROVER: reuse lamp colours, no frame allocations.
 
 export const SYSTEMS = {
+  power: {
+    title: 'Güç dağıtımı · İnverter hatları ve batarya', prompt: 'E · Güç dağıtımı bilgisayarı',
+    status: t => t.controls.power.main ? 'on' : 'off',
+    readouts: t => {
+      const p = t.power, f = p.forecast;
+      return [['Güneş üretimi', `${n(p.solarKW)} kW · ${n(f.energy)} kWh/sol`],
+        ['Batarya', `${n(p.batteryKWh)} / 180 kWh · %${n(p.batteryPercent, 1)}`],
+        ['İnverter 1–2 / doğrudan', `${n(p.directKW ?? 0)} kW`],
+        ['İnverter 3–10 / depolama', `${n(p.storageKW ?? 0)} kW`],
+        ['Tesisler / kullanılan', `${n(t.powerKW)} kW`],
+        ['Tahmin / doğrudan + destek', `${n(f.direct)} + ${n(f.backup)} kWh`],
+        ['Tahmin / LED gündüz + gece', `${n(f.dayLed)} + ${n(f.lit)} saat`],
+        ['Tahmin / sondaj ve su', `${n(f.drilling)} saat · ${n(f.waterLiters)} L`],
+        ['Gerçek / çıkarılan su', `${n(t.water.extractedL)} L`]];
+    },
+    controls: [['power', 'main', 'Ana şalter · sera / sondaj'], ['power', 'batterySupport', 'Sera / sondaj için batarya desteği'],
+      ...Array.from({ length: 10 }, (_, i) => ['power', 'inv' + (i + 1), `İnverter ${i + 1} · ${i < 2 ? 'doğrudan' : 'habitat / batarya'} · 42 panel`])],
+    note: '420 panel → 10 inverter; 1–2 doğrudan sera/sondaj, 3–10 habitat/batarya. Batarya 180 kWh. Tahmin bir solun örnek profilidir; canlı batarya ayrı ilerler. Güç tahmini %10 buz ve süblimasyon kullanır; gerçek su tesisi İhan’ın %50 buz, 20 L/6 saat sistemler modelini korur. Fırtına geçirgenliği %20 oyun varsayımıdır.',
+  },
   // ROVER: registered by the scene host; shares the facility computer and E interaction.
   rover: {
     title: 'Perseverance · Rover bilgisayarı', prompt: 'E · Rover bilgisayarı', controls: [],
@@ -58,7 +77,7 @@ export const SYSTEMS = {
     ],
     controls: [['greenhouse', 'irrigation', 'Sulama pompası']],
     modes: ['greenhouse', 'led', [['auto', 'Otomatik'], ['on', 'Açık'], ['off', 'Kapalı']]],
-    note: 'Otomatik modda LED’ler Güneş 10°’nin altına inince yanar (tamamlayıcı fotoperiyot). Varsayım: ~8 m² yatak × 150 W/m² ≈ 1,2 kW. Bitkilerin O₂ katkısı doğrulanmadığı için hesaba katılmaz (İhan, sistemler/README).',
+    note: 'Otomatik modda LED’ler Güneş 10°’nin altına inince yanar. İhan’ın altı 1,28 × 2,37 m yatağı, PPFD 350 ve alg ışığı hesabıyla LED gücü 3,36528 kW. Bitkilerin O₂ katkısı doğrulanmadığı için hesaba katılmaz (İhan, sistemler/README).',
   },
 }
 
@@ -218,6 +237,7 @@ export function createSystemConsoles({ scene, heightAt, placements, emitters, ge
   function show(id) {
     if (!consoles[id]) return // ROVER
     open = id
+    panel.dataset.system = id
     panel.querySelector('.sc-results').replaceChildren(); panel.querySelector('.sc-results').className = 'sc-results' // ROVER
     panel.querySelector('.sc-eyebrow').textContent = id === 'rover' ? 'MARS 2020 / YÜZEY BİLİMİ' : 'TESİS BİLGİSAYARI' // ROVER
     if (document.pointerLockElement) document.exitPointerLock()

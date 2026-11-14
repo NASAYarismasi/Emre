@@ -78,7 +78,11 @@ function makeScene() {
   const environment = createEnvironment(scene, camera, canvas)
   const ova = createOvaWorld(scene)
   // Host perf: İhan's domes/tunnels (~330 parts) and the 108 horizon mounds never move -> per-material batches.
-  for (const root of [scene.getObjectByName('Ihan_pressurised_habitat'), ...scene.children.filter(o => o.isGroup && o.children.length > 50 && o.children.every(c => c.isMesh && !c.children.length))]) if (root) batchStaticLeaves(root)
+  for (const root of [scene.getObjectByName('Ihan_pressurised_habitat'), ...scene.children.filter(o => o.isGroup && o.children.length > 50 && o.children.every(c => c.isMesh && !c.children.length))]) if (root) {
+    const hatches = new Set(ova.locks.flatMap(lock => [lock.inner, lock.outer]));
+    for (const hatch of hatches) batchStaticLeaves(hatch);
+    batchStaticLeaves(root, hatches);
+  }
   const navigation = createOvaNavigation(ova)
   const ground = ova.ground
   let currentView = 'panorama'
@@ -86,7 +90,7 @@ function makeScene() {
     return ground.userData.heightAt(x, z)
   }
   // IHAN-SRC: keep real facilities outside the dome/lander clearances.
-  const lifeSupport = createLifeSupportFacilities(scene, groundY, state)
+  const lifeSupport = createLifeSupportFacilities(scene, groundY, state, ova.solar)
   Object.assign(ova.views, lifeSupport.views)
   const tracks = createFootprints(scene, groundY)
   const crewLander = batchStaticModel(createMarsLander())

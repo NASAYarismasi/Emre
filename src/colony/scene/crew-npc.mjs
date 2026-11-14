@@ -7,7 +7,7 @@ import * as T from 'three'
 // GAME ASSUMPTIONs for pacing; the chores themselves mirror real surface-ops concerns:
 // dust on solar arrays (NASA Mars surface power), CO₂ scrubber filters, ice-drill wear, crop care.
 export const CREW_SITES = {
-  greenhouse: { x: 26.8, z: -.4, face: Math.PI, text: 'Serada bitki bakımı · besin çözeltisi ölçümü' },
+  greenhouse: { x: 19.8, z: 35.6, face: Math.PI, text: 'Serada bitki bakımı · besin çözeltisi ölçümü' },
   air: { x: 19, z: 9.6, face: Math.PI, text: 'Hava tesisi · CO₂ filtre kontrolü' },
   water: { x: 64, z: -21.4, face: Math.PI, text: 'Su tesisi · buz matkabı bakımı' },
   solar: { x: -40.5, z: 31, face: -Math.PI / 2, text: 'Güneş panelleri · toz temizliği' },
@@ -20,9 +20,9 @@ const ROLE_SITES = {
   construction: ['pad', 'solar'],
 }
 const ROUTINE = ['greenhouse', 'solar', 'air', 'rover', 'water', 'pad']
-// Keep-out circles (x, z, radius) for walking: the whole dome+tunnel complex as one circle (three
+// GAME ASSUMPTION: keep-out circles (x, z, radius) for walking: the whole dome+tunnel complex as one circle (three
 // overlapping dome circles would send a detour from one dome into the next), lander, greenhouse, plants.
-const OBSTACLES = [[0, 0, 14.5], [-18, -12, 6.6], [26, -12.6, 8.2], [19, 6, 3], [64, -26, 3.2]]
+const OBSTACLES = [[0, 0, 14.5], [-18, -12, 6.6], [19, 26, 9.2], [19, 6, 3], [64, -26, 3.2]]
 const WALK = 1.0 // m/s, suit-limited EVA walking pace (Apollo EVA traverses ≈ 1 m/s)
 const STRIDE_HZ = .75 // steps per second per leg at 1 m/s; low gravity → long, slow strides
 

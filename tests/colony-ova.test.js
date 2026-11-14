@@ -8,12 +8,12 @@ import {prepareOvaRover} from '../src/colony/ihan/assets.mjs';
 const context = () => ({
   createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),
   getImageData:(x,y,w,h)=>({data:new Uint8ClampedArray(w*h*4)}),
-  createRadialGradient:()=>({addColorStop(){}}),putImageData(){},fillRect(){},
+  createRadialGradient:()=>({addColorStop(){}}),putImageData(){},fillRect(){},fillText(){},
   beginPath(){},arc(){},ellipse(){},fill(){},stroke(){},moveTo(){},lineTo(){},
 });
 let scene,world;
 beforeEach(()=>{
-  vi.stubGlobal('document',{createElement:()=>({getContext:context}),createElementNS:()=>({addEventListener(){},removeEventListener(){},style:{}})});
+  vi.stubGlobal('document',{querySelectorAll:()=>[],getElementById:()=>null,createElement:()=>({getContext:context}),createElementNS:()=>({addEventListener(){},removeEventListener(){},style:{}})});
   scene=new THREE.Scene(); world=createOvaWorld(scene); scene.updateMatrixWorld(true);
 });
 afterEach(()=>{
@@ -21,7 +21,7 @@ afterEach(()=>{
   scene.traverse(o=>{if(o.geometry)resources.add(o.geometry);for(const m of [o.material].flat())if(m){resources.add(m);for(const v of Object.values(m))if(v?.isTexture)resources.add(v);}});
   resources.forEach(r=>r.dispose()); vi.unstubAllGlobals();
 });
-describe('İhan Düz Ova world (real source a7d5ce6)',()=>{
+describe('İhan Düz Ova world (real source ed79956)',()=>{
   it('keeps the three connected dome floors and source camera positions',()=>{
     for(const x of [-9,0,9,-4.5,4.5]) expect(world.isInsideFloor(x,0)).toBe(true);
     expect(world.isInsideFloor(0,5)).toBe(false);
@@ -33,11 +33,16 @@ describe('İhan Düz Ova world (real source a7d5ce6)',()=>{
     const domes=world.habitat.children.filter(o=>o.isGroup && o.position.y===world.floorY);
     expect(domes).toHaveLength(3);
   });
-  it('keeps 42 solar tables in five instanced batches, rocks instanced, and adds no shadow light',()=>{
+  it('keeps 42 solar tables instanced with batched wiring and live switch, rocks instanced, and adds no shadow light',()=>{
     const farm=scene.getObjectByName('MarsSolarFarm');
-    expect(farm.children).toHaveLength(5);
-    expect(farm.children.every(o=>o.isInstancedMesh)).toBe(true);
-    expect(farm.children.map(o=>o.count).sort((a,b)=>a-b)).toEqual([10,42,42,168,168]); // cabinets, backs, faces, posts, footings
+    const instances=[]; farm.traverse(o=>{if(o.isInstancedMesh) instances.push(o)});
+    expect(instances.some(o=>o.count===42)).toBe(true);
+    expect(instances.filter(o=>o.count===168)).toHaveLength(2);
+    expect(world.solar.switchPosition).toBeTruthy();
+    const meshCount=[]; farm.traverse(o=>{if(o.isMesh)meshCount.push(o)});
+    expect(meshCount.length).toBeLessThan(65);
+
+
     const lights=[];scene.traverse(o=>{if(o.isLight)lights.push(o);});
     expect(lights).toHaveLength(6); expect(lights.every(o=>!o.castShadow)).toBe(true);
     const rocks=scene.children.filter(o=>o.isInstancedMesh);

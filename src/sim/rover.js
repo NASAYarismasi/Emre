@@ -34,13 +34,13 @@ export const ROVER_INSTRUMENTS = ['SuperCam', 'PIXL', 'SHERLOC', 'MEDA', 'RIMFAX
 export const ROVER_HOME = { id: 'base', name: 'Üs parkı', x: 5.75, z: 14.5 }
 export const ROVER_STATIONS = [
   { id: 'seitah', name: 'Séítah · olivin', x: -26, z: 24, mineral: 'Olivin + piroksen; zayıf karbonat', elements: [17, 18, 20, 4, .4] },
-  { id: 'delta', name: 'Delta önü', x: 25, z: 26, mineral: 'Karbonat + silikat; suyla değişim izi', elements: [10, 7, 24, 12, 1.8] },
+  { id: 'delta', name: 'Delta önü', x: 33, z: 30, mineral: 'Karbonat + silikat; suyla değişim izi', elements: [10, 7, 24, 12, 1.8] },
   { id: 'salts', name: 'Tuzlu regolit', x: 45, z: 12, mineral: 'Sülfatlı regolit; perklorat adayı (kesin tanı değil)', elements: [14, 6, 22, 7, 4.6] },
   { id: 'layers', name: 'Delta katmanları', x: 42, z: -38, mineral: 'İnce taneli silikat + karbonat', elements: [12, 9, 25, 8, 1.1] },
 ]
 // GAME ASSUMPTION: crew keep-outs enlarged for rover footprint; centre dome + tunnels, lander, facilities.
-export const ROVER_OBSTACLES = [[0, 0, 15.3], [-18, -12, 8], [26, -12.6, 9.6], [19, 6, 4.6], [64, -26, 4.8],
-  [19, 25, 9.6], [-57, 46, 31]] // GAME ASSUMPTION: reserve full relocated greenhouse and solar field too.
+export const ROVER_OBSTACLES = [[0, 0, 15.3], [-18, -12, 8], [19, 26, 11.3], [19, 6, 4.6], [64, -26, 4.8],
+  [-57, 46, 31]] // single greenhouse at İhan's (19,25) site; solar field reserved too
 const distance = (a, b) => Math.hypot(b.x - a.x, b.z - a.z)
 export function roverSegmentClear(a, b, obstacles = ROVER_OBSTACLES) {
   const dx = b.x - a.x, dz = b.z - a.z, d2 = dx * dx + dz * dz

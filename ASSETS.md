@@ -96,3 +96,5 @@ Rover lens adaptation: `src/colony/ova/assets.mjs` disables screen-space transmi
 
 <!-- // TABLET: original layered SVG artwork provenance. -->
 `public/art/eva-tablet-grip-back.svg` ve `eva-tablet-grip-front.svg`: bu proje için çizilen özgün EVA eldivenleri, manşetler ve kumaş detayları; [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). Harici görsel veya NASA modelinden türetilmedi; ekipman oranları temsili oyun tasarımıdır. Tablet kasası CSS ile çizilir, ARES ekran tasarımı Samet'indir.
+
+İhan birleştirmesi (`a7d5ce6` → `ed79956`, 2026-11-15): `src/colony/ihan/` içindeki yeni inverter/kablo/kabin modelleri, fırçalı metal kapı dokuları ve basınç sesi İhan'ın ekip içi prosedürel kaynaklarıdır. Harici görsel/ses veya base64 varlık eklenmedi. Mevcut NASA modellerinin dosyaları ve lisansları korunur. Ayrıntılı kaynak ve uyarlama kaydı: [IHAN-MERGE.md](docs/IHAN-MERGE.md).
