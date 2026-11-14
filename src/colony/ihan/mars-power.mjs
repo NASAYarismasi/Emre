@@ -1,13 +1,13 @@
-/** IHAN-SRC: ed79956 physical forecast; pure, no DOM/Three.js.
+/** IHAN-SRC: 96b5438 isolated AC microgrid forecast (İhan); pure, no DOM/Three.js.
  * GAME ASSUMPTION: tray dimensions/count, PPFD 350, efficacy 2.5 umol/J, optical
- * efficiency .8, algae .18 kW, 12.33 h light, 180 kWh storage, .9 charge efficiency,
- * 20/80 inverter split, 60 kWh daytime habitat and 6 kW night habitat.
- * GAME ASSUMPTION: 42 tables of 20 m2, solar yield 2.5 kWh/m2/sol, panel
- * efficiency .25 and .8 system factor; drill 2 kW and tank 100 L.
- * GAME ASSUMPTION: regolith heat capacity .8, ice 2.05 kJ/kg/K, 43 K heating,
- * 10% ice, 80% capture, 65% process efficiency and .15 kWh/L auxiliaries.
+ * efficiency .8, algae .18 kW, 12.33 h light; 42 tables of 20 m2, 2.5 kWh/m2/sol,
+ * panel efficiency .25, .8 system factor; drill 2 kW; 100 L tank; GRID values below.
+ * Feeder loss: 3·I²·R with copper resistivity 0.0175 Ω·mm²/m (standard handbook value).
  * Sublimation latent heat 2834 kJ/kg (triple-point approximation):
  * https://www.publications.usace.army.mil/Portals/76/Publications/EngineerManuals/EM_1110-2-1406.pdf
+ * Host adaptation (`// Host:`): the power computer's switches (inv1–inv10, batterySupport) map onto
+ * this model — each inverter line carries a tenth of the arrays; without battery support the
+ * flexible loads (LED, drill) may not draw from storage.
  */
 export const DAYLIGHT_HOURS=12.33
 // Six 1.28 x 2.37 m growing trays; algae lights are a separate auxiliary load.
@@ -23,46 +23,85 @@ export const DRILL_HOURS=TANK_L*WATER_KWH_PER_L/DRILL_KW
 export function solarEnergy(tables, transmission) {
   return tables*20*2.5*.25*.8*transmission
 }
-export function powerForecast(transmission,closed=true, switches={}) {
-  const lines=Array.from({length:10},(_,i)=>switches["inv"+(i+1)] !== false)
-  const loadFraction=lines.slice(0,2).filter(Boolean).length/10
-  const chargeFraction=lines.slice(2).filter(Boolean).length/10
-  const batterySupport=switches.batterySupport !== false
-  const energy=solarEnergy(42,transmission)
+// Design assumptions for the isolated AC microgrid.
+export const GRID={capacity:180,chargeKW:25,dischargeKW:12,chargeEfficiency:.90,
+  dischargeEfficiency:.95,habitatKW:6,voltage:400,powerFactor:.95}
+const nightReserve=GRID.habitatKW*DAYLIGHT_HOURS/GRID.dischargeEfficiency
+export {nightReserve}
+
+export function feederLoss(kw,length,area) {
+  const current=kw*1000/(Math.sqrt(3)*GRID.voltage*GRID.powerFactor)
+  return 3*current**2*(.0175*length/area)/1000
+}
+
+export function powerForecast(transmission,closed=true,options={}) {
+  // Host: switches → active array share and battery support for flexible loads.
+  const lines=Array.from({length:10},(_,i)=>options["inv"+(i+1)]!==false).filter(Boolean).length
+  const batterySupport=options.batterySupport!==false
+  const {tables=42*lines/10,capacity=GRID.capacity,initial=0,ledKW=LED_KW,nightDrill=false,dayDrill=true}=options
+  const energy=solarEnergy(tables,transmission)
   const steps=120, dt=DAYLIGHT_HOURS/steps
   const profile=Array.from({length:steps},(_,i)=>Math.sin(Math.PI*(i+.5)/steps))
   const normalization=profile.reduce((sum,value)=>sum+value,0)
-  let battery=0, direct=0, backup=0, drilling=0, dayLed=0, charged=0, dayGap=0
+  const drillKW=DRILL_KW+feederLoss(DRILL_KW,190,4)
+  const lampKW=ledKW+feederLoss(ledKW,105,4)
+  let battery=Math.min(capacity,initial), direct=0, backup=0, drilling=0, dayLed=0, charged=0, dayGap=0, cableLoss=0, unused=0
   for(const weight of profile) {
-    const production=energy*weight/normalization
-    const loadBranch=production*loadFraction
-    const chargeBranch=production*chargeFraction
+    let pv=energy*weight/normalization
+    let dischargeBudget=GRID.dischargeKW*dt
+    const discharge=(need,floor=0)=>{
+      const delivered=Math.min(need,dischargeBudget,Math.max(0,battery-floor)*GRID.dischargeEfficiency)
+      battery-=delivered/GRID.dischargeEfficiency
+      dischargeBudget-=delivered
+      return delivered
+    }
     const habitat=60/steps
-    const availableForStorage=Math.max(0,chargeBranch-habitat)
-    const missingHabitat=Math.max(0,habitat-chargeBranch)
-    const habitatBackup=Math.min(battery,missingHabitat)
-    battery-=habitatBackup
-    dayGap+=missingHabitat-habitatBackup
-    const added=Math.min(180-battery,availableForStorage*.9)
-    battery+=added
+    const pvHabitat=Math.min(pv,habitat)
+    pv-=pvHabitat
+    dayGap+=Math.max(0,habitat-pvHabitat-discharge(habitat-pvHabitat))
+    const reserveInput=Math.min(pv,GRID.chargeKW*dt,
+      Math.max(0,Math.min(capacity,nightReserve)-battery)/GRID.chargeEfficiency)
+    pv-=reserveInput
+    battery+=reserveInput*GRID.chargeEfficiency
+    charged+=reserveInput*GRID.chargeEfficiency
+    if(closed) {
+      // Keep the night reserve intact. Flexible loads share the common AC bus.
+      const use=(kw)=>{
+        const need=kw*dt
+        const fromPV=Math.min(pv,need)
+        pv-=fromPV
+        const fromBattery=batterySupport?discharge(need-fromPV,nightReserve):0 // Host: battery support switch
+        direct+=fromPV
+        backup+=fromBattery
+        return (fromPV+fromBattery)/kw
+      }
+      if(lampKW>0) {
+        const lit=use(lampKW)
+        dayLed+=lit
+        cableLoss+=lit*(lampKW-ledKW)
+      }
+      const drillTime=dayDrill?use(drillKW):0
+      drilling+=drillTime
+      cableLoss+=drillTime*(drillKW-DRILL_KW)
+    }
+    // Avoid charging and discharging the same bank within a step.
+    const chargeInput=dischargeBudget<GRID.dischargeKW*dt?0:
+      Math.min(pv,GRID.chargeKW*dt-reserveInput,(capacity-battery)/GRID.chargeEfficiency)
+    const added=chargeInput*GRID.chargeEfficiency
     charged+=added
-    if(!closed) continue
-    const drillNeed=DRILL_KW*Math.min(dt,DRILL_HOURS-drilling)
-    const ledNeed=LED_KW*dt
-    const fromSolar=Math.min(loadBranch,drillNeed+ledNeed)
-    const fromBattery=Math.min(batterySupport?battery:0,drillNeed+ledNeed-fromSolar)
-    battery-=fromBattery
-    direct+=fromSolar
-    backup+=fromBattery
-    const supply=fromSolar+fromBattery
-    const drillEnergy=Math.min(drillNeed,supply)
-    drilling+=drillEnergy/DRILL_KW
-    dayLed+=(supply-drillEnergy)/LED_KW
+    battery+=added
+    unused+=pv-chargeInput
   }
   const dusk=battery
-  const life=6*DAYLIGHT_HOURS
-  const afterLife=Math.max(0,dusk-life)
-  const lit=closed&&batterySupport?Math.min(DAYLIGHT_HOURS,afterLife/LED_KW):0
+  const life=GRID.habitatKW*DAYLIGHT_HOURS
+  const served=Math.min(life,battery*GRID.dischargeEfficiency,GRID.dischargeKW*DAYLIGHT_HOURS)
+  let nightExtra=Math.max(0,battery*GRID.dischargeEfficiency-served)
+  const nightDrilling=closed&&nightDrill&&batterySupport?Math.min(DAYLIGHT_HOURS,nightExtra/drillKW):0 // Host: battery support
+  nightExtra-=nightDrilling*drillKW
+  const lit=closed&&lampKW>0&&batterySupport?Math.min(DAYLIGHT_HOURS,nightExtra/lampKW):0 // Host: battery support
+  cableLoss+=lit*(lampKW-ledKW)+nightDrilling*(drillKW-DRILL_KW)
+  const dawn=Math.max(0,dusk-(served+nightDrilling*drillKW+lit*lampKW)/GRID.dischargeEfficiency)
   return {energy,average:energy/DAYLIGHT_HOURS,direct,backup,charged,dayLed,dayGap,drilling,
-    waterLiters:drilling*DRILL_KW/WATER_KWH_PER_L,dusk,lit,lifeGap:Math.max(0,life-dusk),dawn:afterLife-lit*LED_KW}
+    nightDrilling,waterLiters:(drilling+nightDrilling)*DRILL_KW/WATER_KWH_PER_L,dusk,lit,
+    lifeGap:life-served,dawn,cableLoss,unused}
 }

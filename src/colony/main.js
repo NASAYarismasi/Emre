@@ -132,3 +132,5 @@ for (const button of document.querySelectorAll('[data-realism]')) {
 // Full-page navigation owns this controller; release listeners on teardown.
 listen(window, 'pagehide', event => { if (!event.persisted) { events.abort(); disposeEclss(); } });
 if (import.meta.hot) import.meta.hot.dispose(() => {events.abort(); disposeEclss();});
+
+import './ihan/power-mission.mjs'; // İhan 96b5438: three-sol microgrid mission (drawer 09)

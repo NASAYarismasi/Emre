@@ -101,7 +101,7 @@ export function addSolarFarm(T, scene, terrainHeight, obstacles, destinations) {
     const ctx=label.getContext("2d")
     ctx.fillStyle="#263033";ctx.fillRect(0,0,256,80)
     ctx.fillStyle="#ddf1ed";ctx.font="bold 30px monospace";ctx.fillText((i+1)+" / DC > AC",18,35)
-    ctx.font="23px monospace";ctx.fillText(i<2?"42 / DOĞRUDAN":"42 / BATARYA",25,66)
+    ctx.font="23px monospace";ctx.fillText(i<2?"42 / AC BARA":"42 / AC BARA",25,66)
     const texture=new T.CanvasTexture(label)
     texture.colorSpace=T.SRGBColorSpace
     part(rack,new T.PlaneGeometry(.68,.21),new T.MeshBasicMaterial({map:texture}),-.63,.93,1.87)
@@ -148,6 +148,12 @@ export function addSolarFarm(T, scene, terrainHeight, obstacles, destinations) {
       "solar-balance":fmt.format(result.energy-413)+" kWh/sol",
       "solar-life-gap":fmt.format(result.lifeGap)+" kWh",
       "solar-average":fmt.format(result.average)+" kW",
+      "solar-reserve":fmt.format(result.dusk)+" / 77,9 kWh",
+      "solar-loss":fmt.format(result.cableLoss)+" kWh",
+      "solar-unused":fmt.format(result.unused)+" kWh",
+      "branch-habitat":result.lifeGap>.001||result.dayGap>.001?"Enerji açığı":"Besleme yeterli",
+      "branch-greenhouse":!closed?"Şalter açık":result.lit>=12.329?"Gece tam ışık":result.lit>0?"Gece kısmi ışık":"Gece ışığı ertelendi",
+      "branch-drill":!closed?"Şalter açık":result.drilling>=12.329?"Gündüz çalışıyor":result.drilling>0?"Gündüz kısıtlı":"Beklemede",
       "solar-direct":fmt.format(result.direct)+" kWh",
       "solar-backup":fmt.format(result.backup)+" kWh",
       "solar-charged":fmt.format(result.charged)+" kWh",

@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="tr">
 <head>
  <meta charset="utf-8">
@@ -109,6 +109,19 @@
      <dl class="eclss-results"><dt>Temiz su rezervi</dt><dd id="life-water">—</dd><dt>Buzdan çıkarıldı</dt><dd id="life-extracted">—</dd><dt>Geri kazanıldı</dt><dd id="life-recycled">—</dd><dt>Güç / ayrılabilir güç</dt><dd id="life-power">—</dd></dl>
      <p class="unit-note">420 panel, 10 inverter ve 180 kWh batarya fiziksel tesisleri besler. Şalterleri güç dağıtımı bilgisayarından yönet. Fırtınada geçirgenlik %20’ye düşer (oyun varsayımı). Başlangıçta 1 iniş enerji birimi = 12 kWh kabul edilir; fiziksel rezervler koloni oyun stoklarından ayrı izlenir.</p>
      <div class="buttons"><button type="button" data-ova-view="greenhouse">Serayı gör</button><button type="button" data-ova-view="air">Hava tesisi</button><button type="button" data-ova-view="water">Su tesisi</button></div>
+     <div class="group" id="power-mission"><!-- İhan 96b5438: power mission -->
+<h3>Görev · Mars’ta elektriği üret ve depola</h3>
+<p>İlk sol açık, sonraki iki sol toz fırtınalı. İlk gün ürettiğin elektriği bataryaya aktar. Üç sol boyunca yaşam desteğini çalıştır ve son sabaha en az 10 kWh rezervle ulaş.</p>
+<button id="power-farm" type="button">Güneş tarlasını incele</button>
+<form>
+<label>Devredeki güneş masası <input name="tables" type="number" min="1" max="42" value="36" required></label>
+<label>Devredeki batarya paketi <input name="packs" type="number" min="1" max="8" value="4" required></label>
+<label><input type="checkbox" name="lights" checked> Gece seraya elektrik ayır</label>
+<label><input type="checkbox" name="drill"> Gündüz sondajı çalıştır</label><button type="submit">Üret, depola ve görevi çalıştır</button>
+</form>
+<output aria-live="polite"></output>
+<details><summary>Görev modelinin varsayımları</summary><p>Görev 8 kWh iniş rezerviyle başlar. Bir masa açık havada 10 kWh/sol üretir, fırtınada üretim %80 düşer. Ortak AC bara gündüz habitatı besler ve gece rezervini doldurur. Esnek yükler ve kalan şarj aynı enerji modeline göre dağıtılır. Paket başına 45 kWh kullanılabilir kapasite vardır. Gece yaşam desteği 12,33 saat boyunca 6 kW ister. Kalan enerji seçilirse 3,37 kW sera ışığına gider. Bu görev, ilk gece hesabından bağımsız bir senaryodur.</p></details>
+</div>
      <h3>Tesis bilgisayarları</h3>
      <p class="muted">Her tesisin yanındaki bilgisayara yürüyüp E’ye bas ya da buradan aç. Kapattığın birim hesaptan da çıkar.</p>
      <div class="buttons"><button type="button" data-console="air">Hava tesisi bilgisayarı</button><button type="button" data-console="water">Su tesisi bilgisayarı</button><button type="button" data-console="greenhouse">Sera bilgisayarı</button><button type="button" data-console="power">Güç dağıtımı</button><button type="button" data-ova-view="power">Güç hatlarını gör</button></div>
