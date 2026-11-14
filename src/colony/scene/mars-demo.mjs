@@ -706,7 +706,7 @@ function makeScene() {
 // embedded in the single-file build; Draco decoder comes from public/draco.
 const modelFiles = {
   "rover-data": "perseverance.glb",
-  "team-crew-data": "team-astronaut.glb",
+  "team-crew-data": "team-astronaut-walk.glb", // arms-down, jointed limbs (scripts/pose-walker.py)
 }
 async function loadBytes(id, signal) {
   const response = await fetch(import.meta.env.BASE_URL + "models/colony/" + modelFiles[id], { signal })

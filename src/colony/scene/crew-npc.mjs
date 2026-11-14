@@ -24,6 +24,20 @@ const ROUTINE = ['greenhouse', 'solar', 'air', 'rover', 'water', 'pad']
 // overlapping dome circles would send a detour from one dome into the next), lander, greenhouse, plants.
 const OBSTACLES = [[0, 0, 14.5], [-18, -12, 6.6], [26, -12.6, 8.2], [19, 6, 3], [64, -26, 3.2]]
 const WALK = 1.0 // m/s, suit-limited EVA walking pace (Apollo EVA traverses ≈ 1 m/s)
+const STRIDE_HZ = .75 // steps per second per leg at 1 m/s; low gravity → long, slow strides
+
+/** Jointed limbs of team-astronaut-walk.glb (origins at shoulder/hip). Re-read after model swaps. */
+function limbs(actor) {
+  const found = { armL: [], armR: [], legL: [], legR: [] }
+  actor.traverse(o => { const m = /^Walk_(armL|armR|legL|legR)/.exec(o.name); if (m) found[m[1]].push(o) })
+  return found
+}
+function swing(parts, arms, legsL, legsR) {
+  for (const o of parts.armL) o.rotation.x = arms
+  for (const o of parts.armR) o.rotation.x = -arms
+  for (const o of parts.legL) o.rotation.x = legsL
+  for (const o of parts.legR) o.rotation.x = legsR
+}
 
 /** Inserts a detour point when the straight segment a→b crosses a keep-out circle. Pure. */
 export function planPath(a, b, depth = 0) {
@@ -54,7 +68,7 @@ function makeLabel() {
   const texture = new T.CanvasTexture(canvas); texture.colorSpace = T.SRGBColorSpace
   const sprite = new T.Sprite(new T.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, sizeAttenuation: false }))
   // Fixed on-screen size (sizeAttenuation off) so the task stays readable from the overview camera.
-  sprite.scale.set(.2, .035, 1); sprite.position.y = 2.35; sprite.renderOrder = 10
+  sprite.scale.set(.34, .0595, 1); sprite.position.y = 2.4; sprite.renderOrder = 10
   sprite.raycast = () => {}
   let current = ''
   return { sprite, set(title, text) {
@@ -88,7 +102,8 @@ export function createCrewAgents({ crewModels, groundY }) {
         if (!agent) return
         const { actor, label } = agent
         // İhan's character loader clears the actor's children when the NASA suit GLB arrives.
-        if (label.sprite.parent !== actor) actor.add(label.sprite)
+        if (label.sprite.parent !== actor) { actor.add(label.sprite); agent.parts = null }
+        if (!agent.parts || !agent.parts.armL.length) agent.parts = limbs(actor)
         actor.rotation.order = 'YXZ'
         const name = 'Astronot ' + (index + 1)
         if (person.health <= 0) { label.sprite.visible = false; return }
@@ -120,13 +135,20 @@ export function createCrewAgents({ crewModels, groundY }) {
             actor.rotation.y = Math.atan2(dx, dz)
           }
           actor.rotation.x = 0
-          // Low-g gait: slow, slightly floaty steps (Mars g = 3.71 m/s²).
-          actor.position.y = groundY(actor.position.x, actor.position.z) + Math.abs(Math.sin(agent.phase * 4.2)) * .05
+          // Low-g gait: slow strides, legs ±24°, arms counter-swinging ±16°, slight float (g = 3.71 m/s²).
+          const s = Math.sin(agent.phase * Math.PI * 2 * STRIDE_HZ)
+          swing(agent.parts, s * .28, s * .42, -s * .42)
+          actor.position.y = groundY(actor.position.x, actor.position.z) + Math.abs(s) * .045
           label.set(name + ' · Yolda', site.text.split(' · ')[0] + ' için yürüyor')
         } else if (agent.mode === 'working') {
           // Slow lean in and out, as if inspecting/handling hardware at chest height.
           actor.position.y = groundY(actor.position.x, actor.position.z)
-          actor.rotation.x = .1 + Math.sin(agent.phase * 1.3) * .07
+          actor.rotation.x = .06 + Math.sin(agent.phase * 1.3) * .04
+          // Hands forward at chest height working on the hardware, small alternating motions.
+          const w = Math.sin(agent.phase * 2.1)
+          for (const o of agent.parts.armL) o.rotation.x = -.95 + w * .18
+          for (const o of agent.parts.armR) o.rotation.x = -.95 - w * .18
+          for (const o of [...agent.parts.legL, ...agent.parts.legR]) o.rotation.x = 0
           label.set(name + (person.role ? ' · ' + { production: 'Üretim', maintenance: 'Bakım', construction: 'İnşaat' }[person.role] : ''), site.text)
         }
       })
