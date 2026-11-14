@@ -122,10 +122,10 @@ export function createEffects(scene) {
       // NTR uses reactor heat, not combustion. No orange flame/Mach diamonds.
       // https://www.nasa.gov/space-technology-mission-directorate/tdm/space-nuclear-propulsion/
       m.scale.set(radius*expand,length*(type==='retro'?.2+power*.8:.65+power*.35),radius*expand);m.material.uniforms.time.value=s.missionTime+(s.phase==='PRELAUNCH'?s.countdown.time:0);// Methalox retro plumes are faint in Martian daylight; the NTR hydrogen plume nearly invisible.
-      m.material.uniforms.power.value=type==='transit'?power*.055:type==='retro'?power*.45:power;m.material.uniforms.pressure.value=pressure;
+      m.material.uniforms.power.value=type==='transit'?power*.055:type==='retro'?power*.3:power;m.material.uniforms.pressure.value=pressure;
     }
     engineLight.position.y=s.mars?1.5:-3;
-    engineLight.intensity=(solid?90000:core?45000:s.phase==='EDL'&&s.engineFiring?(s.altitude<150?320:6000)*s.throttle:0)*(.92+.08*Math.sin(s.missionTime*103));
+    engineLight.intensity=(solid?90000:core?45000:s.phase==='EDL'&&s.engineFiring?(s.altitude<150?320:900)*s.throttle:0)*(.92+.08*Math.sin(s.missionTime*103));
     cone.material.opacity=launch?Math.max(0,1-Math.abs((s.mach??0)-1)/.13)*Math.min(1,s.density/.15)*.22:0;
     plasma.visible=s.phase==='EDL'&&(s.heatFlux??0)>2000;plasma.material.uniforms.heat.value=Math.min(1.6,(s.heatFlux??0)/28000);plasma.material.uniforms.time.value=s.missionTime;plasma.rotation.z=!s.engineFiring?Math.atan2(Math.sqrt(Math.max(0,s.surfaceVelocity**2-s.verticalSpeed**2)),-s.verticalSpeed):0;
     plasma.position.set(0,2,0).applyAxisAngle(new THREE.Vector3(0,0,1),plasma.rotation.z);

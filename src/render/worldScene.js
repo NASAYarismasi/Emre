@@ -47,7 +47,9 @@ export function createWorldScene() {
         heatShield.position.set(r*Math.sin(angle),r*Math.cos(angle)-s.polar[0],0);
         heatShield.rotation.set(shield.age*.11,0,shield.age*.17);
       }
-      sun.castShadow=s.altitude<1500;ambient.intensity=s.phase==='CRUISE'?.18:s.mars?.85:Math.max(.18,1.2*Math.exp(-(s.altitude??0)/30000));
+      sun.castShadow=s.altitude<1500;// Mars-phase lighting also applies before the 'mars' flag is set (MOI → deorbit coast).
+      const atMars=s.mars||['MOI_BURN','MARS_ORBIT','DEORBIT','EDL','LANDED'].includes(s.phase);
+      ambient.intensity=s.phase==='CRUISE'?.18:atMars?.85:Math.max(.18,1.2*Math.exp(-(s.altitude??0)/30000));
       if(s.altitude<5000) {scene.fog=new THREE.FogExp2(s.mars?0x9d7453:0x5587b5,s.mars?.000022:.000002*Math.exp(-s.altitude/5000));}else scene.fog=null;
       for(const b of s.debris){let model=detached.get(b.id);if(!model){model=vehicle.makeDebris(b.id);scene.add(model);detached.set(b.id,model);
         const flash=new THREE.Group();for(const y of [-20,20]){const flare=new THREE.Mesh(new THREE.SphereGeometry(.6,12,8),new THREE.MeshBasicMaterial({color:new THREE.Color(6,4,2),transparent:true,blending:THREE.AdditiveBlending,depthWrite:false}));flare.position.set(b.id==='srbLeft'?-2:2,y,0);flash.add(flare);}model.add(flash);model.userData.flash=flash;

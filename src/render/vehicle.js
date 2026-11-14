@@ -69,6 +69,8 @@ export function createVehicle(assets) {
     const t=now();
     for(const c of covers){
       const on=Boolean(config[c.key]);
+      // The world scene reparents the covers to the simulated jettison trace; that trace owns them then.
+      if(c.obj.parent!==lander){c.was=on;continue;}
       if(on){c.start=null;c.obj.visible=true;c.obj.position.copy(c.home);c.obj.rotation.set(0,0,0);}
       else{
         if(c.was&&c.start===null)c.start=t;
