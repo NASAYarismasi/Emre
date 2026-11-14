@@ -59,6 +59,26 @@ export function createVehicle(assets) {
   const gear=lander.getObjectByName('landing-gear'),ladder=lander.getObjectByName('crew-ladder');
   const legAxes=Array.from({length:4},(_,i)=>{const a=i*Math.PI/2+Math.PI/4;return new THREE.Vector3(-Math.sin(a),0,Math.cos(a));});
   const orbitOffset=new THREE.Vector3();
+  // Entry-cover separation is shown, not cut: the heat shield drops away below and the backshell is
+  // pulled up/aft and tumbles, revealing the lander that was inside (real-time ~3 s, render only).
+  const covers=[{obj:aeroshell,key:'heatShield',dir:new THREE.Vector3(.15,-1,0),accel:7,spin:1.1},
+    {obj:backshell,key:'backshell',dir:new THREE.Vector3(-.35,1,.12).normalize(),accel:9,spin:-1.6}]
+    .map(c=>({...c,home:c.obj.position.clone(),was:true,start:null}));
+  const now=()=>(typeof performance!=='undefined'?performance.now():Date.now())/1000;
+  function animateCovers(config){
+    const t=now();
+    for(const c of covers){
+      const on=Boolean(config[c.key]);
+      if(on){c.start=null;c.obj.visible=true;c.obj.position.copy(c.home);c.obj.rotation.set(0,0,0);}
+      else{
+        if(c.was&&c.start===null)c.start=t;
+        const e=c.start===null?Infinity:t-c.start;
+        c.obj.visible=e<3.2;
+        if(c.obj.visible){c.obj.position.copy(c.home).addScaledVector(c.dir,.5*c.accel*e*e+1.2*e);c.obj.rotation.set(c.spin*e*.6,0,c.spin*e);}
+      }
+      c.was=on;
+    }
+  }
   return { group, parts, sls, capsule:orion.group, orion:orion.group, transit:transit.group, lander, aeroshell, backshell,
     update(state,onboard=false,camera) {
       const config=vehicleConfiguration(state),angle=state.attitude+state.theta;
@@ -71,7 +91,7 @@ export function createVehicle(assets) {
       orion.group.rotation.z=launch?0:Math.PI;
       orion.wings.forEach(wing=>{wing.rotation.z=(1-config.arrays)*Math.PI/2;});
       transit.arrays.forEach((wing,i)=>{wing.rotation.z=(i===0?1:-1)*(1-config.arrays)*Math.PI/2;});
-      aeroshell.visible=config.heatShield;backshell.visible=config.backshell;
+      animateCovers(config);
       gear.visible=config.lander;ladder.visible=config.ladder;
       gear.children.forEach((leg,i)=>leg.quaternion.setFromAxisAngle(legAxes[i],-2.25*(1-config.legs)));
       sls.visible=launch&&!onboard;lander.visible=config.lander&&!onboard;

@@ -40,7 +40,7 @@ export function createEffects(scene) {
   for(const position of NTR_NOZZLES)jet('transit',position);
   for(let i=0;i<4;i++){const a=i*Math.PI/2;jet('retro',[Math.cos(a)*4.2,1.5,Math.sin(a)*4.2]);}
   const engineLight=new THREE.PointLight(0xffad57,0,400,2);engineLight.position.set(0,-3,0);scene.add(engineLight);
-  const max=2200,positions=new Float32Array(max*3),sizes=new Float32Array(max),colors=new Float32Array(max*4),particles=[],random=seeded(90);
+  const max=3600,positions=new Float32Array(max*3),sizes=new Float32Array(max),colors=new Float32Array(max*4),particles=[],random=seeded(90);
   const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(positions,3));geometry.setAttribute('size',new THREE.BufferAttribute(sizes,1));geometry.setAttribute('color',new THREE.BufferAttribute(colors,4));
   const smoke=new THREE.Points(geometry,new THREE.ShaderMaterial({transparent:true,depthWrite:false,vertexColors:false,
     uniforms:{pixelScale:{value:700}},vertexShader:`attribute float size;attribute vec4 color;varying vec4 vColor;uniform float pixelScale;
@@ -98,7 +98,8 @@ export function createEffects(scene) {
   function emit(s,pos,kind) {
     if(particles.length>=max*quality)particles.shift();
     const c=Math.cos(s.theta),sn=Math.sin(s.theta),x=pos[0],y=pos[1];
-    const speed=kind==='dust'?8+random()*9:5;
+    // Plume-driven regolith: radial ejection 15–35 m/s (SRP/skycrane erosion studies); bounded visual effect.
+    const speed=kind==='dust'?15+random()*20:5;
     const vx=kind==='dust'?pos[0]/Math.max(1,Math.hypot(pos[0],pos[2]))*speed:(random()-.35)*speed;
     particles.push({p:[s.position[0]+x*c+y*sn,s.position[1]-x*sn+y*c,pos[2]],t:s.missionTime+(s.phase==='PRELAUNCH'?s.countdown.time:0),kind,seed:random(),vx:vx*c,vy:-vx*sn,vz:kind==='dust'?pos[2]/Math.max(1,Math.hypot(pos[0],pos[2]))*speed:(random()-.5)*8,theta:s.theta});
   }
@@ -120,10 +121,11 @@ export function createEffects(scene) {
       // GAME ASSUMPTION: a very faint blue visibility cue for hot hydrogen;
       // NTR uses reactor heat, not combustion. No orange flame/Mach diamonds.
       // https://www.nasa.gov/space-technology-mission-directorate/tdm/space-nuclear-propulsion/
-      m.scale.set(radius*expand,length*(type==='retro'?.2+power*.8:.65+power*.35),radius*expand);m.material.uniforms.time.value=s.missionTime+(s.phase==='PRELAUNCH'?s.countdown.time:0);m.material.uniforms.power.value=type==='transit'?power*.055:power;m.material.uniforms.pressure.value=pressure;
+      m.scale.set(radius*expand,length*(type==='retro'?.2+power*.8:.65+power*.35),radius*expand);m.material.uniforms.time.value=s.missionTime+(s.phase==='PRELAUNCH'?s.countdown.time:0);// Methalox retro plumes are faint in Martian daylight; the NTR hydrogen plume nearly invisible.
+      m.material.uniforms.power.value=type==='transit'?power*.055:type==='retro'?power*.45:power;m.material.uniforms.pressure.value=pressure;
     }
     engineLight.position.y=s.mars?1.5:-3;
-    engineLight.intensity=(solid?90000:core?45000:s.phase==='EDL'&&s.engineFiring?18000*s.throttle:0)*(.92+.08*Math.sin(s.missionTime*103));
+    engineLight.intensity=(solid?90000:core?45000:s.phase==='EDL'&&s.engineFiring?(s.altitude<150?320:6000)*s.throttle:0)*(.92+.08*Math.sin(s.missionTime*103));
     cone.material.opacity=launch?Math.max(0,1-Math.abs((s.mach??0)-1)/.13)*Math.min(1,s.density/.15)*.22:0;
     plasma.visible=s.phase==='EDL'&&(s.heatFlux??0)>2000;plasma.material.uniforms.heat.value=Math.min(1.6,(s.heatFlux??0)/28000);plasma.material.uniforms.time.value=s.missionTime;plasma.rotation.z=!s.engineFiring?Math.atan2(Math.sqrt(Math.max(0,s.surfaceVelocity**2-s.verticalSpeed**2)),-s.verticalSpeed):0;
     plasma.position.set(0,2,0).applyAxisAngle(new THREE.Vector3(0,0,1),plasma.rotation.z);
@@ -142,29 +144,35 @@ export function createEffects(scene) {
         if(e.altitude<30)for(let j=0;j<2;j++)emit(sample,[(random()-.5)*70,-e.altitude-9,(random()-.5)*45],e.phase==='PRELAUNCH'?'water':'ground');
       }processedTime=e.time;
     }
-    if(dt>0&&s.phase==='EDL'&&s.engineFiring&&s.altitude<30) {
-      carry+=Math.min(dt,.3)*220*quality*(.25+.75*(s.throttle??0))*(1-s.altitude/35);const count=Math.floor(carry);carry-=count;
+    // GAME ASSUMPTION (order of magnitude): a crew-class retro-propulsive lander erodes regolith from
+    // ~120 m (Curiosity's far smaller skycrane plume already lifted dust at ~20 m, NASA/JPL 2012).
+    // Intensity grows ~ (1 - h/120)^2 with throttle; the ring widens as the plume spreads at low height.
+    if(dt>0&&s.phase==='EDL'&&s.engineFiring&&s.altitude<120) {
+      const near=1-s.altitude/120, ring=4+s.altitude*.22;
+      carry+=Math.min(dt,.3)*520*quality*(.3+.7*(s.throttle??0))*near*near;const count=Math.floor(carry);carry-=count;
       for(let i=0;i<count;i++) {
-        if(s.mars)emit(s,[(random()-.5)*14,-s.altitude+.45,(random()-.5)*14],'dust');
+        const a=random()*Math.PI*2, r=ring*(.35+random()*.65);
+        if(s.mars)emit(s,[Math.cos(a)*r,-s.altitude+.3,Math.sin(a)*r],'dust');
       }
     }
     // A short contact puff also survives a large deterministic test time step.
     // Dust advection/settling is a bounded visual effect, not terrain physics.
     if(s.phase!=='LANDED')landedDust=false;
     if(s.phase==='LANDED'&&!landedDust){
-      for(let i=0;i<90*quality;i++)emit(s,[(random()-.5)*16,.35,(random()-.5)*16],'dust');
+      for(let i=0;i<320*quality;i++){const a=random()*Math.PI*2,r=2+random()*9;emit(s,[Math.cos(a)*r,.3,Math.sin(a)*r],'dust');}
       landedDust=true;
     }
     const c=Math.cos(s.theta),sn=Math.sin(s.theta);let n=0;
     for(let i=particles.length-1;i>=0;i--) {
-      const p=particles[i],age=clock-p.t,life=p.kind==='water'?6:p.kind==='dust'?9:100;
+      const p=particles[i],age=clock-p.t,life=p.kind==='water'?6:p.kind==='dust'?12:100;
       if(age>life){particles.splice(i,1);continue;}
-      const loft=p.kind==='dust'?Math.min(2.8,age*.8)*Math.exp(-age/5):Math.min(60,age*1.4);
-      const drift=p.kind==='dust'?4*(1-Math.exp(-age/4)):age;
+      // Dust: fast radial sheet that decelerates (drag), lofts a few metres and settles over ~12 s.
+      const loft=p.kind==='dust'?Math.min(6,age*2.4)*Math.exp(-age/4.5)*(.5+p.seed):Math.min(60,age*1.4);
+      const drift=p.kind==='dust'?1.6*(1-Math.exp(-age/1.6)):age;
       const dx=p.p[0]+p.vx*drift+loft*Math.sin(p.theta)-s.position[0],dy=p.p[1]+p.vy*drift+loft*Math.cos(p.theta)-s.position[1];
       positions[n*3]=dx*c-dy*sn;positions[n*3+1]=dx*sn+dy*c;positions[n*3+2]=p.p[2]+p.vz*drift;
-      sizes[n]=p.kind==='water'?1+age:p.kind==='dust'?3+age*2:7+age*(p.kind==='ground'?5:2.4);
-      const shade=.42+p.seed*.22,glow=Math.max(0,1-age/5)*(p.kind==='ground'?1.2:.5);colors.set(p.kind==='dust'?[.47,.28,.14,(1-age/life)*.35]:p.kind==='water'?[.8,.88,.9,(1-age/life)*.25]:[shade+.08+glow,shade+.07+glow*.45,shade+.04,(1-age/life)*.43],n*4);n++;
+      sizes[n]=p.kind==='water'?1+age:p.kind==='dust'?3.5+age*3.6:7+age*(p.kind==='ground'?5:2.4);
+      const shade=.42+p.seed*.22,glow=Math.max(0,1-age/5)*(p.kind==='ground'?1.2:.5);colors.set(p.kind==='dust'?[.5,.31,.17,Math.min(1,age*3)*(1-age/life)*.3]:p.kind==='water'?[.8,.88,.9,(1-age/life)*.25]:[shade+.08+glow,shade+.07+glow*.45,shade+.04,(1-age/life)*.43],n*4);n++;
     }
     geometry.setDrawRange(0,n);geometry.attributes.position.needsUpdate=true;geometry.attributes.size.needsUpdate=true;geometry.attributes.color.needsUpdate=true;smoke.material.uniforms.pixelScale.value=height;
   }};

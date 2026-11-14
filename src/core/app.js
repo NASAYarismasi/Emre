@@ -114,6 +114,7 @@ export async function bootstrap(){
   });
   function sync(){if(!ready)return;previousState=currentState=snapshot();loop.advance(0);}
   previousState=currentState=snapshot();ready=true;hud.ready(assets.failures);
+  let landingCamDone=false;
   function direct(seconds){
     if(loop.paused||ui.title||manualTime)return;
     const choice=pacing.update(mission.getTelemetry(),seconds);
@@ -124,6 +125,11 @@ export async function bootstrap(){
     const accepted=candidates.find(w=>mission.setWarp(w))??1;
     loop.setPlaybackRate(Math.min(choice.rate,accepted));
     if(choice.burn)mission.burn();
+    // Cinematic flow: frame the final descent from the landing-site camera (dust plume, touchdown),
+    // once per descent and only if the player is still on the default chase camera.
+    const t=mission.getTelemetry();
+    if(t.phase!=='EDL')landingCamDone=false;
+    else if(!landingCamDone&&t.altitude<600){landingCamDone=true;if(cameras.selected===0)cameras.select(2);}
   }
   let previous=performance.now();graphics.renderer.setAnimationLoop(now=>{const elapsed=Math.max(0,(now-previous)/1000);frameDelta=Math.min(.1,Math.max(.001,elapsed));previous=now;fps=fps*.95+Math.min(120,1/Math.max(.001,elapsed))*.05;
     // Slice long browser frames so event anticipation sees intermediate states.

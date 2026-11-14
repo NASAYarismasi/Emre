@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it , vi} from 'vitest';
 import { MISSION_PHASES } from '../src/sim/mission.js';
 import { MARS } from '../src/sim/constants.js';
 import { entryFromOrbit } from '../src/sim/edl.js';
@@ -70,7 +70,13 @@ it('keeps actual Orion, lander and both cover identities from launch through EDL
       expect(aeroshell.visible).toBe(true);expect(backshell.visible).toBe(true);
       expect(orion.children).toContain(wing);
     }
-    vehicle.update(snapshot('EDL',{events:[{type:'HEATSHIELD_JETTISON',time:99}]}));
+    const jettison=snapshot('EDL',{events:[{type:'HEATSHIELD_JETTISON',time:99}]}), t0=performance.now();
+    vehicle.update(jettison); vehicle.update(jettison);
+    // Separation is shown: both covers still visible, moving away from the lander for ~3 s.
+    expect(aeroshell.visible).toBe(true);expect(backshell.visible).toBe(true);
+    const clock=vi.spyOn(performance,'now').mockReturnValue(t0+1500); vehicle.update(jettison);
+    expect(backshell.position.y).toBeGreaterThan(aeroshell.position.y+3);
+    clock.mockReturnValue(t0+4000); vehicle.update(jettison); clock.mockRestore();
     expect(aeroshell.visible).toBe(false);expect(backshell.visible).toBe(false);
     expect(vehicle.lander).toBe(lander);
     vehicle.update(snapshot('LANDED'));expect(lander.getObjectByName('crew-ladder').visible).toBe(true);
