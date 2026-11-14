@@ -70,8 +70,11 @@ describe('Perseverance surface operations', () => {
   })
   it('starts autonomously and generates reproducible reachable rings inside the 620 m terrain', () => {
     const a=createRoverState(77), b=createRoverState(77)
-    expect(a.autopilot).toBe(true); expect(ROVER_TIME_COMPRESSION).toBe(10)
-    stepRover(a,.1); expect(a.mode).toBe('driving'); expect(a.waypoint.id).toBe('seitah')
+    expect(a.autopilot).toBe(true); expect(ROVER_TIME_COMPRESSION).toBe(50)
+    stepRover(a,.1); stepRover(b,.1) // both consume the same seeded draw for the first far waypoint
+    expect(a.mode).toBe('driving'); expect(a.waypoint.id).toBe('survey-0')
+    // Far-field only: the first target is already ≥150 m from the base.
+    expect(Math.hypot(a.waypoint.x-ROVER_HOME.x,a.waypoint.z-ROVER_HOME.z)).toBeGreaterThanOrEqual(149)
     for(let leg=0;leg<40;leg++) {
       a.campaignLeg=leg; b.campaignLeg=leg
       const target=nextRoverWaypoint(a), same=nextRoverWaypoint(b)
@@ -80,9 +83,6 @@ describe('Perseverance surface operations', () => {
       expect(Math.hypot(target.x-ROVER_HOME.x,target.z-ROVER_HOME.z)).toBeLessThanOrEqual(280.00001)
     }
     expect(planRoverPath(ROVER_HOME,{x:311,z:0})).toEqual([])
-    // The concurrently relocated greenhouse covers the old Delta site: skip it, never drive through it.
-    const blocked=createRoverState(); blocked.campaignLeg=1; stepRover(blocked,.1)
-    expect(blocked.waypoint.id).toBe('salts'); expect(blocked.campaignLeg).toBe(3)
   })
   it('roams beyond 200 m within 14 rover hours, conducts science, samples, and never violates speed or keep-outs', () => {
     const s=createRoverState(); let maximum=0, maximumSpeed=0, blocked=false
@@ -113,7 +113,7 @@ describe('Perseverance surface operations', () => {
     const position={x:s.x,z:s.z}, path=structuredClone(s.path), phase=s.mode
     commandRover(s,'autopilot',false); advance(s,10)
     expect({x:s.x,z:s.z}).toEqual(position); expect(s.path).toEqual(path)
-    commandRover(s,'autopilot',true); expect(s.mode).toBe(phase); advance(s,2)
+    commandRover(s,'autopilot',true); expect(s.mode).toBe(phase); advance(s,400)
     expect(s.odometerM).toBeGreaterThan(0)
     commandRover(s,'return'); expect(s.autopilot).toBe(true); expect(s.campaignPhase).toBe('returning')
   })

@@ -10,7 +10,10 @@ export const ROVER_MAX_SPEED_MPS = .042
 // https://www.nasa.gov/missions/mars-2020-perseverance/perseverance-rover/mars-2020-rover-gets-its-wheels/
 export const ROVER_WHEEL_RADIUS_M = .525 / 2
 // GAME ASSUMPTION: fixed rover clock multiplier; applied once by the render adapter, never to SI speed.
-export const ROVER_TIME_COMPRESSION = 10
+// ×50 → the real 0.042 m/s AutoNav pace shows as ~2.1 m/s, so a 270 m traverse takes ~2 real minutes.
+export const ROVER_TIME_COMPRESSION = 50
+// Team lead: no science next to the base — only out in the field.
+export const ROVER_MIN_SCIENCE_RANGE_M = 100
 // GAME ASSUMPTION: 10 m edge margin inside crater-ecosystem.mjs's 620 m square terrain.
 // That terrain's analytic relief has < .02 rad slopes; rocks/facilities are supplied as keep-outs.
 export const ROVER_WORLD_LIMIT_M = 300
@@ -166,9 +169,9 @@ function driveTo(state, target) {
 /** Seeded expanding survey rings; radius stays within the finite terrain even at cardinal bearings. */
 export function nextRoverWaypoint(state) {
   const leg = state.campaignLeg
-  if (leg < ROVER_STATIONS.length) return {...ROVER_STATIONS[leg]}
-  // GAME ASSUMPTION: four spokes per ring, 100/160/220/280 m, small seeded azimuth jitter.
-  const index=leg-ROVER_STATIONS.length, radius=Math.min(280,100+60*Math.floor(index/4))
+  // GAME ASSUMPTION: far-field survey only — four spokes per ring at 150/210/270 m, seeded azimuth jitter.
+  // The near stations stay as mineral 'context' for the synthetic measurements, never as targets.
+  const index=leg, radius=Math.min(270,150+60*Math.floor(index/4))
   const angle=index*Math.PI/2+.2+(random(state)-.5)*.16
   const context=ROVER_STATIONS[index%ROVER_STATIONS.length]
   return {...context,id:`survey-${leg}`,name:`Keşif ${leg+1} · ${radius} m`,
@@ -201,7 +204,7 @@ function autopilot(state) {
   // Unreachable science sites are skipped deterministically (e.g. relocated facilities / rocks).
   for(let attempt=0;attempt<16;attempt++) {
     const target=nextRoverWaypoint(state); state.campaignLeg++
-    if (driveTo(state,target)) { state.sciencePending=true; return }
+    if (driveTo(state,target)) { state.sciencePending=Math.hypot(target.x-ROVER_HOME.x,target.z-ROVER_HOME.z)>=ROVER_MIN_SCIENCE_RANGE_M; return }
   }
   state.message='Güvenli keşif hedefi aranıyor.'
 }
