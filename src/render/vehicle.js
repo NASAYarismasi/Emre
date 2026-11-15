@@ -44,6 +44,40 @@ export function createVehicle(assets) {
   for(const [id,pivot] of Object.entries(PARTS)) {
     const part=new THREE.Group();part.position.fromArray(pivot);parts[id]=part;sls.add(part);
     if(id==='orion'){part.add(orion.group);continue;}
+    if(id==='core'){
+      if(split.core){split.core.geometry.dispose();split.core.material.dispose();}
+      const orange=material(0xbc6d32,.78,.12);
+      const trim=material(0xdedfd7,.6,.2);
+      cylinder(part,4.2,4.2,57,orange,[0,0,0]);
+      cylinder(part,4.2,4.2,4.5,trim,[0,-30.75,0]);
+      // Continuous interstage reaches the upper stage and separates with the core.
+      cylinder(part,2.6,4.2,4.6,trim,[0,30.8,0]);
+      cylinder(part,2.6,2.6,3.8,trim,[0,34.5,0]);
+      for(const y of [-27.9,0,27.9]){
+        cylinder(part,4.23,4.23,.12,orange,[0,y,0]);
+      }
+      continue;
+    }
+    if(id==='icps'){
+      if(split.icps){split.icps.geometry.dispose();split.icps.material.dispose();}
+      cylinder(part,2.6,2.6,8.8,white,[0,1,0]);
+      cylinder(part,2.27,2.6,2.4,white,[0,6.6,0]);
+      cylinder(part,2.6,1.0,1.4,white,[0,-4.1,0]);
+      const nozzle=new THREE.Mesh(new THREE.CylinderGeometry(.55,1.15,2.1,32,1,true),material(0x28333c,.55,.65));
+      nozzle.material.side=THREE.DoubleSide;
+      nozzle.position.y=-5.85;
+      part.add(nozzle);
+      continue;
+    }
+    if(id==='las'){
+      // Continuous launch fairing and escape tower seated over Orion.
+      if(split.las){split.las.geometry.dispose();split.las.material.dispose();}
+      const profile=[[2.62,-7.85],[2.62,-7.6],[2.38,-7.1],[1.24,-4.9],[.64,-4.35],[.43,-3.95],[.43,2.9],[.35,3.32],[.18,3.78],[0,4]];
+      const tower=new THREE.Mesh(new THREE.LatheGeometry(profile.map(([r,y])=>new THREE.Vector2(r,y)),48),white);
+      tower.castShadow=true;
+      part.add(tower);
+      continue;
+    }
     if(split[id]) {
       const lod=new THREE.LOD();lod.autoUpdate=false;lod.addLevel(split[id],0);
       const height=id.startsWith('srb')?54:id==='core'?66:id==='icps'?14:id==='orion'?8:8;
@@ -91,7 +125,7 @@ export function createVehicle(assets) {
       // twelve-second relative animation never changes the mission trajectory.
       orion.group.position.set(0,launch?0:17.1+(1-config.docking)*18,0);
       orion.group.rotation.z=launch?0:Math.PI;
-      orion.wings.forEach(wing=>{wing.rotation.z=(1-config.arrays)*Math.PI/2;});
+      orion.wings.forEach(wing=>{wing.visible=!launch;wing.rotation.z=(1-config.arrays)*Math.PI/2;});
       transit.arrays.forEach((wing,i)=>{wing.rotation.z=(i===0?1:-1)*(1-config.arrays)*Math.PI/2;});
       animateCovers(config);
       gear.visible=config.lander;ladder.visible=config.ladder;
@@ -111,9 +145,9 @@ export function createVehicle(assets) {
       parts.core.visible=state.stages.find(s=>s.id==='core').attached;parts.las.visible=state.lasAttached;
       parts.icps.visible=state.stages.find(s=>s.id==='icps').attached;
       // Keep the retained upper stack near the floating origin after the lower stack separates.
-      sls.position.set(0,parts.core.visible?0:-70,0).applyAxisAngle(new THREE.Vector3(0,0,1),sls.rotation.z);
+      sls.position.set(0,0,0).applyAxisAngle(new THREE.Vector3(0,0,1),sls.rotation.z);
       if(camera)sls.traverse(m=>{if(m.isLOD){const distance=camera.position.length()*Math.tan(camera.fov*Math.PI/360)/Math.tan(Math.PI/8);m.levels[0].object.visible=distance<2500;m.levels[1].object.visible=distance>=2500;}});
     },
-    makeDebris(id) {const source=parts[id];const clone=source.clone(true);clone.traverse(m=>{if(m.isMesh){m.geometry=m.geometry.clone();m.material=m.material.clone();}});clone.position.set(0,0,0);return clone;}
+    makeDebris(id) {const source=parts[id];const clone=source.clone(true);clone.traverse(m=>{if(m.isMesh){m.geometry=m.geometry.clone();m.material=m.material.clone();}});clone.position.set(0,0,0);clone.visible=true;return clone;}
   };
 }

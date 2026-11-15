@@ -1,7 +1,7 @@
-import { batchStaticLeaves } from "../scene/static-model.mjs"
-import { addPowerCables } from "./power-cables.mjs"
-import { powerForecast, DAYLIGHT_HOURS, DRILL_HOURS } from "./mars-power.mjs"
-export function addSolarFarm(T, scene, terrainHeight, obstacles, destinations) {
+import {drawGroupHmi} from './power/group-hmi.mjs';
+import {batchStaticLeaves} from '../scene/static-model.mjs';
+import {addPowerCables} from './power-cables.mjs';
+export function addSolarFarm(T, scene, terrainHeight, obstacles) {
   // Adapted from Samet's solar preview in 0e3352a87baebff83558045dcb539462d3ecf4f7.
   const farm = new T.Group()
   farm.name = "MarsSolarFarm"
@@ -39,12 +39,12 @@ export function addSolarFarm(T, scene, terrainHeight, obstacles, destinations) {
   const face = new T.PlaneGeometry(5,4).rotateX(-Math.PI/2)
   const column = new T.BoxGeometry(.13,1,.13)
   const footing = new T.BoxGeometry(.44,.14,.44)
-  const tables=[]
+  const tables=[];
   for (let row = 0; row < 6; row++) for (let col = 0; col < 7; col++) {
     const x = (col - 3) * 6, z = (row - 2.5) * 8
     const y = terrainHeight(x0 + x, z0 + z) - level
+    tables.push({x,y,z,row});
     const table = new T.Group()
-    tables.push({x,y,z})
     table.position.set(x,y+2.25,z)
     table.rotation.x = .55
     farm.add(table)
@@ -62,6 +62,11 @@ export function addSolarFarm(T, scene, terrainHeight, obstacles, destinations) {
       new T.Vector3(x0+x-2.68,level+y,z0+z-1.93),
       new T.Vector3(x0+x+2.68,level+y+3.4,z0+z+1.93)))
   }
+  instanceByGeometry(T,farm);
+  const brushes=new T.InstancedMesh(new T.BoxGeometry(4.95,.08,.13),new T.MeshStandardMaterial({color:0x4b5150,roughness:.8}),42);
+  brushes.name="SolarCleaningBrushes";
+  brushes.instanceMatrix.setUsage(T.DynamicDrawUsage);farm.add(brushes);
+  const brushTransform=new T.Object3D();
   const cabinet=new T.BoxGeometry(2.8,2.3,1.6)
   const enclosure=new T.MeshStandardMaterial({color:0xa4aa9e,metalness:.42,roughness:.66})
   const terminal=new T.MeshStandardMaterial({color:0x252d32,roughness:.76})
@@ -73,6 +78,9 @@ export function addSolarFarm(T, scene, terrainHeight, obstacles, destinations) {
   const displayTexture=new T.CanvasTexture(display)
   displayTexture.colorSpace=T.SRGBColorSpace
   const displayMaterial=new T.MeshBasicMaterial({map:displayTexture})
+  const hmi=[];
+  const screens=[];
+  let groupReadings=[], groupDaylight;
   const inverters=[]
   for(let i=0;i<10;i++) {
     const x=23+4*Math.floor(i/5),z=(i%5-2)*4.5
@@ -90,8 +98,15 @@ export function addSolarFarm(T, scene, terrainHeight, obstacles, destinations) {
       for(let slot=0;slot<6;slot++) part(rack,new T.BoxGeometry(.85,.035,.025),terminal,side,.50+slot*.083,.903)
     }
     part(rack,new T.BoxGeometry(.18,.14,.04),hazard,-.88,1.76,.91)
-    const monitor=part(rack,new T.PlaneGeometry(.91,.455),displayMaterial,.67,1.91,.908)
+    if(i%2===0){
+      const canvas=document.createElement('canvas');canvas.width=768;canvas.height=384;
+      const texture=new T.CanvasTexture(canvas);texture.colorSpace=T.SRGBColorSpace;
+      hmi.push({canvas,texture,detail:false,material:new T.MeshBasicMaterial({map:texture})});
+    }
+    const monitor=part(rack,new T.PlaneGeometry(.91,.455),hmi[Math.floor(i/2)].material,.67,1.91,.908);
     monitor.castShadow=false
+    monitor.userData.groupIndex=Math.floor(i/2);
+    screens.push(monitor);
     part(rack,new T.BoxGeometry(1.05,1.25,.56),terminal,-.63,.68,1.51)
     part(rack,new T.BoxGeometry(.94,1.13,.06),enclosure,-.63,.68,1.82)
     part(rack,new T.BoxGeometry(.64,.075,.035),hazard,-.63,1.1,1.86)
@@ -108,106 +123,74 @@ export function addSolarFarm(T, scene, terrainHeight, obstacles, destinations) {
     rack.updateWorldMatrix(true,true)
     obstacles.push(new T.Box3().setFromObject(rack).expandByScalar(.12))
   }
-  const wiring=destinations ? addPowerCables(T,farm,
-    (x,z)=>terrainHeight(x0+x,z0+z)-level,
-    Object.fromEntries(Object.entries(destinations).map(([key,site])=>[key,{x:site.x-x0,z:site.z-z0}])),
-    tables,inverters) : null
-  const lifecycle=new AbortController()
-  const weatherButtons=document.querySelectorAll("[data-solar-weather]")
-  const moment=document.getElementById("battery-moment")
-  const fmt=new Intl.NumberFormat("tr-TR",{maximumFractionDigits:1})
-  let transmission=1
-  let closed=true
-  const breaker=document.getElementById("main-breaker")
-  function toggleBreaker() {
-    closed=!closed
-    update()
-    document.dispatchEvent(new CustomEvent("mars-breaker",{detail:closed}))
+  screen.fillStyle='#101b22';screen.fillRect(0,0,512,256);screen.fillStyle='#d6f0ed';screen.font='28px monospace';screen.fillText('KOLONI BATARYASI',24,48);screen.fillText('YER ALTI BESLEME',24,100);displayTexture.needsUpdate=true;
+  const wiring=addPowerCables(T,farm,(x,z)=>terrainHeight(x0+x,z0+z)-level,{greenhouse:{x:26-x0,z:-11-z0},water:{x:64-x0,z:-26-z0},moxie:{x:19-x0,z:6-z0},habitat:{x:-x0,z:-z0}},tables,inverters);
+  wiring.setClosed(true);
+  farm.updateMatrixWorld(true);
+  const hitTargets=screens.map(screen=>{
+    const target=new T.Mesh(screen.geometry,screen.material);
+    target.matrixWorld.copy(screen.matrixWorld);
+    target.userData.groupIndex=screen.userData.groupIndex;
+    return target;
+  });
+  batchStaticLeaves(farm,new Set([wiring.lever]));
+  // Host adaptation: the weather buttons only exist on İhan's stand-alone page (and not in node tests).
+  const weatherButtons = typeof document?.querySelectorAll === "function" ? document.querySelectorAll("[data-solar-weather]") : []
+  const update = (factor) => {
+    const produced = 42 * 10 * 2 * 2.5 * .25 * .8 * factor
+    const balance = produced - 413
+    document.getElementById("solar-generated").textContent = produced + " kWh/sol"
+    document.getElementById("solar-balance").textContent = (balance >= 0 ? "+" : "") + balance + " kWh/sol"
+    for (const button of weatherButtons) button.setAttribute("aria-pressed", String(Number(button.dataset.solarWeather) === factor))
   }
-  breaker?.addEventListener("click",toggleBreaker,{signal:lifecycle.signal})
-  function update(live) {
-    const result=live?.forecast ?? powerForecast(transmission,closed)
-    wiring?.setClosed(closed)
-    if(breaker) {
-      breaker.setAttribute("aria-pressed",String(closed))
-      breaker.textContent=closed?"Ana şalteri indir":"Ana şalteri kaldır"
-    }
-    const status=document.getElementById("breaker-status")
-    if(status) status.textContent=closed?"Sera ve sondaj hattı bağlı":"Sera ve sondaj hattı kesildi"
-    const stored=live?.batteryKWh ?? (moment?.value==="dawn"?result.dawn:result.dusk)
-    const soc=stored/180
-    screen.fillStyle="#101b22";screen.fillRect(0,0,512,256)
-    screen.fillStyle="#d6f0ed";screen.font="32px monospace";screen.fillText("BATARYA / ENERJI",24,46)
-    screen.font="54px monospace";screen.fillText(fmt.format(stored)+" kWh",24,114)
-    screen.font="35px monospace";screen.fillText(Math.round(soc*100)+" %",24,171)
-    screen.fillStyle="#31464e";screen.fillRect(24,194,464,32)
-    screen.fillStyle="#6bd5ad";screen.fillRect(24,194,464*soc,32)
-    displayTexture.needsUpdate=true
-    const metrics={
-      "solar-generated":fmt.format(result.energy)+" kWh/sol",
-      "solar-balance":fmt.format(result.energy-413)+" kWh/sol",
-      "solar-life-gap":fmt.format(result.lifeGap)+" kWh",
-      "solar-average":fmt.format(result.average)+" kW",
-      "solar-reserve":fmt.format(result.dusk)+" / 77,9 kWh",
-      "solar-loss":fmt.format(result.cableLoss)+" kWh",
-      "solar-unused":fmt.format(result.unused)+" kWh",
-      "branch-habitat":result.lifeGap>.001||result.dayGap>.001?"Enerji açığı":"Besleme yeterli",
-      "branch-greenhouse":!closed?"Şalter açık":result.lit>=12.329?"Gece tam ışık":result.lit>0?"Gece kısmi ışık":"Gece ışığı ertelendi",
-      "branch-drill":!closed?"Şalter açık":result.drilling>=12.329?"Gündüz çalışıyor":result.drilling>0?"Gündüz kısıtlı":"Beklemede",
-      "solar-direct":fmt.format(result.direct)+" kWh",
-      "solar-backup":fmt.format(result.backup)+" kWh",
-      "solar-charged":fmt.format(result.charged)+" kWh",
-      "solar-day-led":fmt.format(result.dayLed)+" saat",
-      "solar-day-gap":fmt.format(result.dayGap)+" kWh",
-      "solar-drill":fmt.format(result.drilling)+" saat · "+fmt.format(result.waterLiters)+" / 100 L",
-      "solar-led":fmt.format(result.lit)+" / 12,33 saat · %"+fmt.format(result.lit/DAYLIGHT_HOURS*100),
-      "solar-storage":fmt.format(stored)+" / 180 kWh · %"+fmt.format(soc*100)
-    }
-    for(const [id,value] of Object.entries(metrics)) {
-      const target=document.getElementById(id)
-      if(target) target.textContent=value
-    }
-    for(const button of weatherButtons) button.setAttribute("aria-pressed",String(Number(button.dataset.solarWeather)===transmission))
+  if (weatherButtons.length) {
+    for (const button of weatherButtons) button.addEventListener("click", () => update(Number(button.dataset.solarWeather)))
+    update(1)
   }
-  for(const button of weatherButtons) button.addEventListener("click",()=>{
-    transmission=Number(button.dataset.solarWeather)
-    update()
-  },{signal:lifecycle.signal})
-  moment?.addEventListener("change",update,{signal:lifecycle.signal})
-  update()
-  // Host lifecycle: batching detaches source leaves, so retain their resources for teardown.
-  const resources=new Set()
-  const remember=()=>farm.traverse(o=>{
-    if(o.geometry) resources.add(o.geometry)
-    for(const material of [o.material].flat()) if(material) {
-      resources.add(material)
-      for(const value of Object.values(material)) if(value?.isTexture) resources.add(value)
-    }
-  })
-  remember()
-  // Host perf: preserve table instancing; cable/cabinet leaves batch by material, live lever excluded.
-  instanceByGeometry(T, farm, wiring?.lever)
-  batchStaticLeaves(farm, new Set(wiring ? [wiring.lever] : []))
-  remember()
-  return {dispose(){lifecycle.abort();for(const resource of resources)resource.dispose();resources.clear()}, farm, level, x0, z0, toggleBreaker,
-    setPower(state) { transmission=state.transmission; closed=state.switches.main; update(state) }, switchPosition:wiring && farm.localToWorld(wiring.switchPosition.clone())}
+  const ray=new T.Raycaster(),pointer=new T.Vector2()
+  return {farm,level,x0,z0,setClosed:wiring.setClosed,
+    interact(camera,event,canvas){
+      const rect=canvas.getBoundingClientRect()
+      pointer.set((event.clientX-rect.left)/rect.width*2-1,1-(event.clientY-rect.top)/rect.height*2)
+      ray.setFromCamera(pointer,camera)
+      ray.far=18
+      const hit=ray.intersectObjects(hitTargets,false)[0]
+      if(!hit)return false
+      const index=hit.object.userData.groupIndex
+      hmi[index].detail=!hmi[index].detail
+      this.updatePowerDisplay(groupReadings,groupDaylight)
+      return true
+    },
+    framePower(strokes){
+    tables.forEach((table,index)=>{
+      brushTransform.position.set(table.x,table.y+2.25,table.z);
+      brushTransform.rotation.set(.55,0,0);
+      brushTransform.translateY(.12);brushTransform.translateZ(-1.95+(strokes[table.row]??0)*3.9);
+      brushTransform.updateMatrix();brushes.setMatrixAt(index,brushTransform.matrix);
+    });
+    brushes.instanceMatrix.needsUpdate=true;
+  },updatePowerDisplay(groups,daylight){
+    groupReadings=groups;
+    groupDaylight=daylight;
+    hmi.forEach((screen,i)=>{const index=i%5;const g=groups[index];if(!g)return;
+      drawGroupHmi(screen.canvas.getContext('2d'),index,{...g,energy:g.stored,daylight},screen.detail);screen.texture.needsUpdate=true;});
+  },updateBatteryDisplay(battery){screen.fillStyle='#101b22';screen.fillRect(0,0,512,256);screen.fillStyle='#d6f0ed';screen.font='30px monospace';screen.fillText('KOLONI BATARYASI',24,48);screen.font='42px monospace';screen.fillText(battery.toFixed(1)+' oyun birimi',24,120);screen.font='24px monospace';screen.fillText('DC / AC - YER ALTI HAT',24,190);displayTexture.needsUpdate=true;}}
 }
 
 // Host optimisation (Emre/Claude): the farm is static, so the ~390 meshes above (42 tables × back,
 // face, 4 columns, 4 footings + 10 cabinets) collapse into one InstancedMesh per geometry/material
 // pair — same geometry and placement, ~5 draw calls instead of ~390.
-function instanceByGeometry(T, root, live) {
+function instanceByGeometry(T, root) {
   root.updateMatrixWorld(true)
   const inverse = root.matrixWorld.clone().invert()
   const groups = new Map()
   root.traverse(mesh => {
-    if (!mesh.isMesh || mesh.isInstancedMesh || mesh === live) return
+    if (!mesh.isMesh || mesh.isInstancedMesh) return
     const key = mesh.geometry.uuid + "|" + mesh.material.uuid
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key).push(mesh)
   })
   for (const meshes of groups.values()) {
-    if (meshes.length < 2) continue
     const [first] = meshes
     const batch = new T.InstancedMesh(first.geometry, first.material, meshes.length)
     meshes.forEach((mesh, i) => batch.setMatrixAt(i, inverse.clone().multiply(mesh.matrixWorld)))

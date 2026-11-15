@@ -88,22 +88,11 @@ export function createCommsStation(scene, heightAt) {
   const glow = new T.Sprite(new T.SpriteMaterial({ map: new T.CanvasTexture(canvas), color: 0xff1b09,
     blending: T.AdditiveBlending, transparent: true, depthWrite: false, toneMapped: false, fog: false }))
   glow.position.copy(beacon.position); glow.scale.set(1.5, 1.5, 1); group.add(glow)
-  // Match power-cables.mjs: low, dark round jackets, sampled to the ground rather than floating.
-  for (const offset of [0, .13]) {
-    const points = []
-    for (let i = 1; i < COMMS_CABLE_ROUTE.length; i++) {
-      const [ax, az] = COMMS_CABLE_ROUTE[i - 1], [bx, bz] = COMMS_CABLE_ROUTE[i]
-      const steps = Math.ceil(Math.hypot(bx - ax, bz - az))
-      for (let s = i === 1 ? 0 : 1; s <= steps; s++) {
-        const x = T.MathUtils.lerp(ax, bx, s / steps), z = T.MathUtils.lerp(az, bz, s / steps) + offset
-        points.push(new T.Vector3(x - COMMS_PAD.x, heightAt(x, z) + .052 - group.position.y, z - COMMS_PAD.z))
-      }
-    }
-    const path = new T.CurvePath()
-    const first = points[0].clone(); first.y += .9; points.unshift(first)
-    const last = points.at(-1).clone(); last.y += .55; points.push(last)
-    for (let i = 1; i < points.length; i++) path.add(new T.LineCurve3(points[i - 1], points[i]))
-    part(group, new T.TubeGeometry(path, points.length * 2, .045, 6, false), dark)
+  // Buried service cables: render only the short terminal risers at either end.
+  for(const offset of [0,.13])for(const [x,z] of [COMMS_CABLE_ROUTE[0],COMMS_CABLE_ROUTE.at(-1)]){
+    const base=heightAt(x,z)-group.position.y;
+    const path=new T.LineCurve3(new T.Vector3(x-COMMS_PAD.x,base-.15,z-COMMS_PAD.z+offset),new T.Vector3(x-COMMS_PAD.x,base+.55,z-COMMS_PAD.z+offset));
+    part(group,new T.TubeGeometry(path,1,.045,6,false),dark);
   }
   const [endX, endZ] = COMMS_CABLE_ROUTE.at(-1)
   part(group, new T.BoxGeometry(.4, .5, .25), steel, endX-COMMS_PAD.x,

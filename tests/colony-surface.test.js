@@ -1,3 +1,4 @@
+import { MARS_SOL_SECONDS } from '../src/sim/marsSun.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as T from 'three';
 import { createEnvironment } from '../src/colony/scene/environment.mjs';
@@ -77,7 +78,7 @@ describe('surface environment integration', () => {
     key('BracketRight'); expect(environment.telemetry.warp).toBe(10);
     key('BracketRight'); key('BracketRight'); expect(environment.telemetry.warp).toBe(60);
     key('BracketLeft'); expect(environment.telemetry.warp).toBe(10);
-    key('KeyM'); expect(environment.telemetry.audio).toBe(false);
+    const audioBefore=environment.telemetry.audio; key('KeyM'); expect(environment.telemetry.audio).toBe(audioBefore);
     environment.update(10); environment.reset(); expect(environment.telemetry.lmst).toBeCloseTo(8,5);
     expect(environment.telemetry.warp).toBe(1);
     environment.dispose(); expect(document.body.children).toHaveLength(0); expect(document.head.children).toHaveLength(0);
@@ -102,8 +103,8 @@ describe('FPS movement and terrain contracts', () => {
     const z=camera.position.z; key('KeyW'); fps.update(1);
     expect(z-camera.position.z).toBeCloseTo(1.2,2); expect(onStep).toHaveBeenCalled();
     key('ShiftLeft'); const walkZ=camera.position.z; fps.update(1);
-    expect(walkZ-camera.position.z).toBeCloseTo(2.2,2);
-    key('KeyQ'); const stopZ=camera.position.z; fps.update(1); expect(camera.position.z).toBe(stopZ);
+    expect(walkZ-camera.position.z).toBeCloseTo(3.0,2);
+    key('Tab'); const stopZ=camera.position.z; fps.update(1); expect(camera.position.z).toBe(stopZ);
     key('Space'); fps.update(.2); expect(camera.position.y).toBeGreaterThan(1.8); expect(fps.telemetry.grounded).toBe(false);
     fps.update(1); expect(camera.position.y).toBeCloseTo(1.65,5); expect(fps.telemetry.grounded).toBe(true);
     key('Escape'); expect(fps.active).toBe(true);

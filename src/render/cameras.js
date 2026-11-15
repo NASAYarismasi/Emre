@@ -12,7 +12,7 @@ export function createCameras(canvas) {
   canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointerup',up);canvas.addEventListener('pointermove',move);canvas.addEventListener('wheel',wheel,{passive:false});
   return {camera,get selected(){return selected;},get effective(){return effective;},get name(){return CAMERA_NAMES[selected]+(selected===4?` / ${CAMERA_NAMES[effective]}`:'');},
     select(i){selected=(i+6)%6;initialized=false;zoom=1;},cycle(){this.select(selected+1);},
-    update(s,dt){
+    update(s,dt,surfaceY){
       landingSequence.update(s.phase,dt);
       const configuration=vehicleConfiguration(s),inLander=configuration.cabin==='lander',stack=configuration.docked;
       effective=selected;
@@ -24,7 +24,7 @@ export function createCameras(canvas) {
       }
       if(s.phase==='LANDED')effective=0;
       if(effective!==lastEffective){initialized=false;lastEffective=effective;}
-      const launch=configuration.launch,h=launch?(s.stages.find(p=>p.id==='core').attached?(s.phase==='ASCENT'?25:48):10):stack?0:5;
+      const launch=configuration.launch,h=launch?(s.stages.find(p=>p.id==='core').attached?(s.phase==='ASCENT'?25:48):80):stack?0:5;
       target.set(0,h,0);camera.up.set(0,1,0);camera.fov=45;camera.near=.15;
       if(effective===0){
         // GAME ASSUMPTION: framing margins for the ~67 m assembled vehicle.
@@ -46,7 +46,7 @@ export function createCameras(canvas) {
         if(inLander){
           // GAME ASSUMPTION: autonomous site camera, 52 m from the contact
           // reference. Ground height follows the same sim altitude as terrain.
-          desired.set(34,2.5-(s.altitude??0),40);target.set(0,5,0);
+          desired.set(34,9-(s.altitude??0),40);target.set(0,5,0);
           camera.fov=THREE.MathUtils.clamp(2*Math.atan(18*zoom/desired.distanceTo(target))*180/Math.PI,1.2,42);
         }else if(stack){desired.set(80,45,120);target.set(0,-9,0);camera.fov=46;
         }else{
@@ -71,6 +71,10 @@ export function createCameras(canvas) {
       const damping=effective===1||effective===3||effective===5?1:1-Math.exp(-Math.min(.1,dt)*7);
       if(!initialized){camera.position.copy(desired);initialized=true;}else camera.position.lerp(desired,damping);
       if(effective!==5){const shake=effective===1?.006:effective===2?.013:.05;const amount=Math.min(1,(s.acceleration??0)/40+(s.dynamicPressure??0)/40000)*shake;camera.position.x+=Math.sin(s.missionTime*71)*amount;camera.position.y+=Math.sin(s.missionTime*89)*amount;}
+      if(surfaceY && (s.phase==='EDL'||s.phase==='LANDED') && s.altitude<1000 && effective!==1){
+        const floor=surfaceY(camera.position.x,camera.position.z);
+        camera.position.y=Math.max(camera.position.y,floor+5);
+      }
       camera.lookAt(target);camera.updateProjectionMatrix();
     },dispose(){canvas.removeEventListener('pointerdown',down);canvas.removeEventListener('pointerup',up);canvas.removeEventListener('pointermove',move);canvas.removeEventListener('wheel',wheel);}
   };

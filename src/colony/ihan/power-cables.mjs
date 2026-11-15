@@ -4,16 +4,13 @@ export function addPowerCables(T, farm, height, sites, tables, inverters) {
   const ac=new T.MeshStandardMaterial({color:0x23343e,roughness:.82})
   const metal=new T.MeshStandardMaterial({color:0x666e6a,metalness:.45,roughness:.58})
   const cable=(points,radius,material)=>{
-    const path=new T.CurvePath()
-    for(let i=1;i<points.length;i++) {
-      const [x,z,y=height(points[i][0],points[i][1])+radius]=points[i]
-      const [px,pz,py=height(points[i-1][0],points[i-1][1])+radius]=points[i-1]
-      const start=new T.Vector3(px,py,pz),end=new T.Vector3(x,y,z)
-      if(start.distanceToSquared(end)>1e-8) path.add(new T.LineCurve3(start,end))
+    // Long feeders run underground. Only the two terminal risers are rendered.
+    for(const point of [points[0],points.at(-1)]){
+      const [x,z,y=height(point[0],point[1])+radius]=point,ground=height(x,z);
+      if(y<=ground+.08)continue;
+      const curve=new T.LineCurve3(new T.Vector3(x,ground-.12,z),new T.Vector3(x,y,z));
+      const mesh=new T.Mesh(new T.TubeGeometry(curve,1,radius,6,false),material);mesh.receiveShadow=true;farm.add(mesh);
     }
-    const mesh=new T.Mesh(new T.TubeGeometry(path,Math.max(16,Math.ceil(path.getLength()*2)),radius,6,false),material)
-    mesh.receiveShadow=true
-    farm.add(mesh)
   }
   const cabinet=(x,z,w,h,d)=>{
     const box=new T.Mesh(new T.BoxGeometry(w,h,d),metal)
@@ -66,13 +63,17 @@ export function addPowerCables(T, farm, height, sites, tables, inverters) {
   cable([[busX-1.45,busZ+.40,busY],[switchX,switchZ-.27,switchY]],.065,ac)
   const loads=[
     {site:sites.greenhouse,xOffset:-5.16,zOffset:2.7,waypoints:[[35,15.8],[65,15.8]]},
-    {site:sites.water,xOffset:5.12,zOffset:0,waypoints:[[36,16.17],[130,16.17],[130,-72]]}
+    {site:sites.water,xOffset:5.12,zOffset:0,waypoints:[[36,16.17],[130,16.17],[130,-72]]},
+    {site:sites.moxie,xOffset:4.7,zOffset:1,waypoints:[[34,16],[84,16],[84,-39]]},
+    {site:sites.habitat,xOffset:2.8,zOffset:4.2,waypoints:[[33,16],[49,16],[49,-41.8]]}
   ]
-  for(const {site,xOffset,zOffset,waypoints} of loads) {
+  for(const [index,{site,xOffset,zOffset,waypoints}] of loads.entries()) {
+    if(!site)continue
     const x=site.x+xOffset,z=site.z+zOffset
     const y=cabinet(x,z,.62,.83,.38)
     const [endX]=waypoints.at(-1)
-    cable([[switchX,switchZ+.27,switchY],...waypoints,[endX,z],[x,z],[x,z,y],[x-Math.sign(xOffset)*.30,z,y]],.086,ac)
+    const source=index<2?[switchX,switchZ+.27,switchY]:[busX-1.45+(index-2.5)*.4,busZ+.4,busY]
+    cable([source,...waypoints,[endX,z],[x,z],[x,z,y],[x-Math.sign(xOffset)*.30,z,y]],.086,ac)
   }
   return {counts,switchPosition,lever,setClosed(closed){lever.rotation.x=closed?-.72:.72}}
 }

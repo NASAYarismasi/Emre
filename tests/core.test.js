@@ -53,6 +53,6 @@ it('uses a rebindable keyboard table and removes listeners at teardown', () => {
   input.rebind('forward', 'KeyZ'); expect(input.isDown('forward')).toBe(false);
   send('keydown', 'KeyZ'); expect(input.isDown('forward')).toBe(true);
   send('keyup', 'KeyZ'); expect(input.isDown('forward')).toBe(false);
-  send('keydown', 'KeyQ'); expect(action).toHaveBeenCalledWith('watch', expect.any(Event));
-  input.dispose(); action.mockClear(); send('keydown', 'KeyQ'); expect(action).not.toHaveBeenCalled();
+  send('keydown', 'Tab'); expect(action).toHaveBeenCalledWith('watch', expect.any(Event));
+  input.dispose(); action.mockClear(); send('keydown', 'Tab'); expect(action).not.toHaveBeenCalled();
 });

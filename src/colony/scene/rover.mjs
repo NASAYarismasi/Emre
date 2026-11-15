@@ -1,14 +1,15 @@
 // ROVER: Three.js adapter for the pure rover sim and the existing facility computer panel.
 import * as T from 'three'
 import { createRoverState, commandRover, stepRover, roverWheelKinematics, ROVER_STATIONS, ROVER_OBSTACLES,
-  ROVER_TIME_COMPRESSION, ROVER_BATTERY_KWH } from '../../sim/rover.js'
+  ROVER_TIME_COMPRESSION, ROVER_BATTERY_KWH, ROVER_DOCK_CHARGE_W, ROVER_HOME } from '../../sim/rover.js'
 
 const MODES = { parked: 'Parkta', driving: 'Sürüyor', analyzing: 'Analiz yapıyor', sampling: 'Numune alıyor' }
 const number = (v, digits = 1) => v.toLocaleString('tr-TR', { maximumFractionDigits: digits, minimumFractionDigits: digits })
 export const roverReadouts = s => [
+  ['Şarj istasyonu', s.docked ? `${number(s.chargingW??0,0)} W · bağlı` : 'Üs parkında bekliyor'],
   ['Mod / hedef', `${MODES[s.mode]} · ${s.target?.name ?? 'Üs parkı'}`],
   ['Otopilot / kampanya', `${s.autopilot ? 'Açık' : 'Duraklatıldı'} · etap ${s.campaignLeg} · ${s.campaignPhase === 'charging' ? 'MMRTG şarjı' : s.campaignPhase === 'returning' ? 'Üsse dönüyor' : 'Keşif'}`],
-  ['Rover saati', 'Rover zamanı ×10 hızlandırılmış'],
+  ['Rover saati', 'Rover zamanı ×50 hızlandırılmış'],
   ['Üsten uzaklık', `${number(s.distanceFromBaseM)} m`],
   ['Konum (X / Z)', `${number(s.x)} / ${number(s.z)} m`],
   ['Hız / odometre', `${number(s.speedMps, 3)} m/sn · ${number(s.odometerM)} m`],
@@ -31,7 +32,7 @@ function labelSprite() {
     const g = canvas.getContext('2d'); g.clearRect(0, 0, 768, 108)
     g.fillStyle = 'rgba(6,19,29,.87)'; g.fillRect(0, 0, 768, 108)
     g.fillStyle = '#e7b25c'; g.fillRect(0, 0, 5, 108)
-    g.font = '600 29px Barlow, Segoe UI, sans-serif'; g.fillText('PERSEVERANCE / OTOPİLOT · ZAMAN ×10', 24, 35)
+    g.font = '600 29px Barlow, Segoe UI, sans-serif'; g.fillText('PERSEVERANCE / OTOPİLOT · ZAMAN ×50', 24, 35)
     g.fillStyle = '#f2ebe0'; g.font = '500 28px Barlow, Segoe UI, sans-serif'; g.fillText(text, 24, 79, 720)
     texture.needsUpdate = true
   }, dispose() { texture.dispose(); material.dispose(); sprite.removeFromParent() } }
@@ -93,13 +94,13 @@ function trail(scene, heightAt) {
   }, dispose() { for (const o of [tracks, dust]) { o.removeFromParent(); o.geometry.dispose(); o.material.dispose() }; texture.dispose(); soft.dispose() } }
 }
 
-export function createRover({ scene, reference, heightAt, focus }) {
+export function createRover({ scene, reference, heightAt, focus, reserveEnergy=()=>0 }) {
   // Recover conservative rock keep-outs from the rendered, seeded terrain once.
   // The pure sim receives only numeric circles; it never imports Three.js or samples DOM state.
   const obstacles=ROVER_OBSTACLES.map(c=>[...c]), matrix=new T.Matrix4(), bounds=new T.Box3()
   scene.updateMatrixWorld(true)
   scene.traverse(part=>{
-    if(!part.isInstancedMesh || part.geometry.type!=='IcosahedronGeometry' || part.material.metalness!==.03) return
+    if(!part.isInstancedMesh || part.geometry.type!=='IcosahedronGeometry' || part.material.metalness!==0) return
     part.geometry.computeBoundingBox()
     for(let i=0;i<part.count;i++) {
       part.getMatrixAt(i,matrix); matrix.premultiply(part.matrixWorld); bounds.copy(part.geometry.boundingBox).applyMatrix4(matrix)
@@ -108,6 +109,17 @@ export function createRover({ scene, reference, heightAt, focus }) {
       if(bounds.max.y-heightAt(x,z)>.25) obstacles.push([x,z,Math.hypot(bounds.max.x-bounds.min.x,bounds.max.z-bounds.min.z)/2+1.35])
     }
   })
+  // Existing parking computer now overlooks a docking bay, without moving the rover home.
+  const station=new T.Group();station.name='RoverChargingDock';scene.add(station);
+  station.position.set(ROVER_HOME.x,heightAt(ROVER_HOME.x,ROVER_HOME.z),ROVER_HOME.z);
+  const metal=new T.MeshStandardMaterial({color:0x56646b,metalness:.65,roughness:.52}),mark=new T.MeshStandardMaterial({color:0xc5a55c,roughness:.8});
+  function dockBox(w,h,d,x,y,z,material){const o=new T.Mesh(new T.BoxGeometry(w,h,d),material);o.position.set(x,y,z);o.receiveShadow=true;station.add(o);return o;}
+  for(const x of [-1.05,1.05])dockBox(.25,.035,3.2,x,.025,0,mark);
+  for(const z of [-1.65,1.65])dockBox(2.6,.035,.12,0,.025,z,mark);
+  dockBox(.48,1.2,.38,-1.7,.6,.8,metal);dockBox(.7,.08,.6,-1.7,.06,.8,metal);
+  const dockLamp=new T.Mesh(new T.SphereGeometry(.055,10,6),new T.MeshStandardMaterial({color:0xe4ad50,emissive:0xe4ad50,emissiveIntensity:1}));dockLamp.position.set(-1.7,1.23,.8);station.add(dockLamp);
+  const dockLead=new T.Mesh(new T.TubeGeometry(new T.CatmullRomCurve3([new T.Vector3(-1.7,.9,.8),new T.Vector3(-1.4,.45,.65),new T.Vector3(-1.2,.55,.2)]),16,.035,6,false),metal);station.add(dockLead);
+  const chargingLine=document.createElement('canvas');chargingLine.width=256;chargingLine.height=96;const gc=chargingLine.getContext('2d');gc.fillStyle='#10232a';gc.fillRect(0,0,256,96);gc.fillStyle='#b5edd5';gc.font='bold 23px sans-serif';gc.fillText('ROVER / SARJ',18,37);gc.font='19px sans-serif';gc.fillText('250 W - E: TABLET',18,72);const dockTexture=new T.CanvasTexture(chargingLine);dockTexture.colorSpace=T.SRGBColorSpace;const plate=new T.Mesh(new T.PlaneGeometry(.55,.21),new T.MeshBasicMaterial({map:dockTexture}));plate.position.set(-1.7,.99,1.0);station.add(plate);
   const state = createRoverState(2026,{obstacles}), label = labelSprite(), tracks = trail(scene, heightAt), wheels=[]
   scene.add(label.sprite)
   const style = document.createElement('style')
@@ -149,6 +161,7 @@ export function createRover({ scene, reference, heightAt, focus }) {
       toggle.textContent=state.autopilot?'Otopilotu duraklat':'Otopilotu sürdür'
       toggle.setAttribute('aria-pressed',String(state.autopilot))
     }
+    if(controlsBox){const recall=controlsBox.querySelector('[data-rover-action="return"]');if(recall)recall.textContent=state.returnPlan?'Üsse çağırmayı iptal et':'Üsse çağır';}
     if (key === lastResult) return
     lastResult = key; box.replaceChildren()
     box.append(Object.assign(document.createElement('p'), { role: 'status', textContent: state.message }))
@@ -189,33 +202,36 @@ export function createRover({ scene, reference, heightAt, focus }) {
     },
     renderControls(box, on) {
       controlsBox = box; box.classList.add('rover-controls'); lastResult = ''
-      const note=Object.assign(document.createElement('p'),{textContent:'Rover zamanı ×10 hızlandırılmış. AutoNav rotayı izler; bilim planı cihazları ve numuneyi otomatik yönetir.'})
+      const note=Object.assign(document.createElement('p'),{textContent:'Rover zamanı ×50 hızlandırılmış. AutoNav rotayı izler; bilim planı cihazları ve numuneyi otomatik yönetir.'})
       const actions = document.createElement('div'); actions.className = 'rover-actions'
       for (const [action, text] of [['autopilot', state.autopilot?'Otopilotu duraklat':'Otopilotu sürdür'], ['return', 'Üsse çağır']]) {
         const b = Object.assign(document.createElement('button'), { type: 'button', textContent: text }); b.dataset.roverAction = action
         on(b, 'click', () => {
-          command(action)
+          command(action==='return'&&state.returnPlan?'cancel-return':action)
           if (resultBox) renderResults(resultBox)
         }); actions.append(b)
       }
-      // A read-only location link changes only the camera, never the rover campaign.
-      const locate=Object.assign(document.createElement('a'),{href:'#',textContent:'↗ Canlı rover görünümü'})
-      on(locate,'click',e=>{e.preventDefault();focus(state.x,state.z)})
-      box.append(note,actions,locate)
+      box.append(actions);
+
     },
     renderResults,
     update(dt, warp, camera) {
       realTime += dt
-      // GAME ASSUMPTION: fixed rover ×10 on top of colony warp. Every watt/second uses the same rover clock.
+      // GAME ASSUMPTION: fixed rover ×50 on top of colony warp. Every watt/second uses the same rover clock.
       const oldDistance=state.odometerM,oldHeading=state.heading,simDt=dt*warp*ROVER_TIME_COMPRESSION
       let remaining = simDt
-      while (remaining > 1e-9) { const h = Math.min(.1, remaining); stepRover(state, h); remaining -= h }
+      while (remaining > 1e-9) { const h = Math.min(.1, remaining);
+        const atDock=state.mode==='parked'&&Math.hypot(state.x-ROVER_HOME.x,state.z-ROVER_HOME.z)<.7;
+        const request=atDock?Math.min(Math.max(0,ROVER_BATTERY_KWH-state.batteryKWh),ROVER_DOCK_CHARGE_W*h/3600000):0;
+        const energy=request>0?reserveEnergy(request):0;
+        const beforeGrid=state.gridEnergyKWh??0;stepRover(state,h,{dockPowerW:h?energy*3600000/h:0});const delivered=(state.gridEnergyKWh??0)-beforeGrid;if(energy>delivered)reserveEnergy(delivered-energy);remaining-=h }
       const travel=state.odometerM-oldDistance,yaw=state.heading-oldHeading
       for(const wheel of wheels) {
         const motion=roverWheelKinematics(travel,yaw,wheel.lateral,wheel.forward,wheel.corner)
         wheel.spin.rotation.x=(wheel.spin.rotation.x+motion.angularSpeedRadS)%(Math.PI*2)
         if(simDt>0) wheel.pivot.rotation.y=roverWheelKinematics(state.speedMps,state.yawRateRadS,wheel.lateral,wheel.forward,wheel.corner).steeringRad
       }
+      dockLamp.material.color.set(state.chargingW>0?0x66dbb1:state.docked?0x75a9ce:0xe4ad50);dockLamp.material.emissive.copy(dockLamp.material.color);dockLead.visible=Boolean(state.docked);
       reference.position.set(state.x, heightAt(state.x, state.z), state.z)
       reference.rotation.order = 'YXZ'; reference.rotation.y = state.heading
       const sx = Math.sin(state.heading), sz = Math.cos(state.heading)
@@ -243,7 +259,7 @@ export function createRover({ scene, reference, heightAt, focus }) {
     },
     reset() { Object.assign(state, createRoverState(2026,{obstacles})); for(const w of wheels){w.spin.rotation.x=0;w.pivot.rotation.y=0}; drawRoute(); lastResult = '' },
     dispose() {
-      label.dispose(); tracks.dispose(); style.remove(); flash.removeFromParent(); flash.material.dispose()
+      station.removeFromParent();const owned=new Set();station.traverse(o=>{if(o.geometry)owned.add(o.geometry);if(o.material){owned.add(o.material);if(o.material.map)owned.add(o.material.map)}});owned.forEach(r=>r.dispose());label.dispose(); tracks.dispose(); style.remove(); flash.removeFromParent(); flash.material.dispose()
       for (const o of [markers, posts, route]) { o.removeFromParent(); o.geometry.dispose(); o.material.dispose() }
     },
   }

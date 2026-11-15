@@ -41,6 +41,6 @@ it('announces sim events and landing milestones in Turkish', () => {
   expect(landingCallout({...t,altitude:999,events:[{type:'LEGS_DEPLOYED',time:100}]})).toContain('1000 m');
   expect(landingCallout({...t,altitude:900,missionTime:104,events:[{type:'LEGS_DEPLOYED',time:100}]})).toContain('Bacaklar açıldı');
   expect(landingCallout({...t,altitude:20})).toContain('Yüzey tozu');
-  expect(landingCallout({...t,phase:'LANDED',touchdownSpeed:1.5})).toContain("Jezero'ya hoş geldiniz");
+  expect(landingCallout({...t,phase:'LANDED',touchdownSpeed:1.5})).toBe('');
   expect(landingCallout({...t,phase:'ASCENT'})).toBe('');
 });

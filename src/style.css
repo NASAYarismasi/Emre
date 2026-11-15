@@ -79,3 +79,20 @@
 #event-caption{position:absolute;top:168px;left:50%;transform:translateX(-50%);max-width:calc(100% - 510px);padding:10px 18px;border-left:2px solid #aedbc8;background:#06151ed9;color:#d7e8de;font-size:12px;line-height:1.5;text-align:center;pointer-events:none}
 @media(max-width:1050px){.topbar .clock{min-width:320px}.topbar .clock>strong{font-size:24px}.topbar .identity{min-width:210px}.topbar .phase{max-width:170px;font-size:10px}}
 @media(max-width:750px){.topbar{height:100px;padding:0 14px}.topbar .identity{display:none}.topbar .clock{min-width:0;width:100%}.topbar .clock>strong{font-size:25px}.topbar .phase{display:block;position:absolute;right:14px;top:15px;font-size:9px;max-width:130px;text-align:right}.topbar .phase .live-dot{display:none}.view-caption{top:116px}.telemetry{top:158px}#event-caption{top:160px;left:165px;right:12px;max-width:none;transform:none;font-size:10px}}
+
+.preview-journey{position:fixed;left:25%;right:25%;top:20%;display:flex;align-items:center;justify-content:space-between;gap:18px;pointer-events:none;z-index:5;color:#dde7e9;font-family:Barlow,sans-serif}.preview-journey>span{font-size:13px;letter-spacing:4px}.preview-journey small{display:block;font-size:9px;letter-spacing:2px;margin-top:8px;color:#8b9ba8}.preview-journey>div{text-align:center}.preview-journey b{font-size:11px;letter-spacing:3px;font-weight:500}.preview-earth{color:#8dc8ee}.preview-mars{color:#e5ac87}.preview-journey.is-capture .preview-earth{opacity:.35}
+body:has(.preview-journey) .telemetry,body:has(.preview-journey) .vehicle-panel{opacity:.35}body:has(.preview-journey) .telemetry:hover,body:has(.preview-journey) .vehicle-panel:hover{opacity:1}.clock strong{font-size:25px!important}.preview-journey:after{content:'Sürekli motor izi sinematik gösterimdir';position:fixed;bottom:21%;left:35%;right:35%;text-align:center;font-size:9px;color:#7b8e9d;letter-spacing:1px}
+
+#event-caption{top:25%!important}
+
+/* Preview HUD cleanup requested by Samet. Legacy IDs remain for telemetry updates. */
+.topbar .identity,.orbit-strip,#guidance,.vehicle-panel .crew-status,.vehicle-panel .throttle{display:none!important}
+.topbar{justify-content:space-between}.topbar .phase{margin-right:auto}.bottom{padding-top:0}
+
+#hud #launch-card{box-sizing:border-box;max-height:88dvh;overflow-y:auto;overscroll-behavior:contain;padding:4px 6px 16px}
+#hud #launch-card h1{line-height:1.06;margin-bottom:12px}
+#hud #launch-card .title-actions{display:grid;gap:8px}
+
+#hud #launch-card .title-utilities{display:flex;flex-wrap:wrap;gap:8px}
+#hud:has(#countdown-banner:not([hidden])) .view-caption{visibility:hidden}
+@media(max-height:650px){#hud #launch-card{top:3dvh;max-height:94dvh}#hud #launch-card h1{font-size:clamp(36px,8vh,54px)}#hud #launch-card .title-intro{margin:6px 0}#hud #launch-card .title-rule{margin:8px 0}}

@@ -36,7 +36,7 @@ export function createEffects(scene) {
   function jet(type,pos) {const m=plume(type==='srb'?0xff9d3a:type==='retro'?0xffb778:0x637fff,type==='rs25'||type==='icps');m.position.fromArray(pos);rig.add(m);jets.push({type,m});}
   for(const x of [-6.4,6.4])jet('srb',[x,1,0]);
   for(let i=0;i<4;i++){const a=i*Math.PI/2+Math.PI/4;jet('rs25',[Math.cos(a)*2,0,Math.sin(a)*2]);}
-  jet('icps',[0,66,0]);
+  jet('icps',[0,66.1,0]);
   for(const position of NTR_NOZZLES)jet('transit',position);
   for(let i=0;i<4;i++){const a=i*Math.PI/2;jet('retro',[Math.cos(a)*4.2,1.5,Math.sin(a)*4.2]);}
   const engineLight=new THREE.PointLight(0xffad57,0,400,2);engineLight.position.set(0,-3,0);scene.add(engineLight);
@@ -107,7 +107,7 @@ export function createEffects(scene) {
     const config=vehicleConfiguration(s);
     const clock=s.missionTime+(s.phase==='PRELAUNCH'?s.countdown.time:0)+(s.phase==='LANDED'?landingSequence.elapsed??0:0);
     const dt=lastTime===null?0:Math.max(0,clock-lastTime);lastTime=clock;
-    rig.rotation.z=s.phase==='EDL'?(s.thrustAngle??0):s.attitude+s.theta;rig.position.set(0,['PRELAUNCH','ASCENT'].includes(s.phase)&&!s.stages.find(p=>p.id==='core').attached?-70:0,0).applyAxisAngle(new THREE.Vector3(0,0,1),rig.rotation.z);
+    rig.rotation.z=s.phase==='EDL'?(s.thrustAngle??0):s.attitude+s.theta;rig.position.set(0,0,0).applyAxisAngle(new THREE.Vector3(0,0,1),rig.rotation.z);
     const launch=['PRELAUNCH','ASCENT'].includes(s.phase),solid=launch&&s.phase==='ASCENT'&&s.stages.find(p=>p.id==='srb').attached;
     const core=launch&&s.stages.find(p=>p.id==='core').attached&&(s.engineFiring&&s.throttle>0||s.countdown.running&&s.countdown.time>=-6.5);
     const pressure=Math.max(0,Math.min(1,s.pressure/P0)),expand=Math.min(4,Math.pow(P0/Math.max(10,s.pressure),.16));

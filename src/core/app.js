@@ -54,10 +54,10 @@ export async function bootstrap(){
     else if(action==='camera'){cameras.cycle();sync();}
     else if(action==='interact'||action==='stage'){if(mission.state.phase==='PRELAUNCH')commands.launch();else if(!loop.paused)mission.stage();}
     else if(action==='burn')commands.burn();else if(['pause','menu'].includes(action))commands.pause();
-    else if(action==='help')commands.help();else if(action==='watch')commands.watch();else if(['warp','warpUp','warpDown'].includes(action))commands.warp(action==='warpDown'?-1:1);
+    else if(action==='help')commands.help();else if(action==='watch')commands.watch();
     else if(action==='mute')commands.mute();
-    else if(action==='automatic')commands.automatic();
-    else if(action==='manual'&&canManual()){ui.manual=!ui.manual;if(ui.manual)pacing.setManual(loop.warp);else mission.setThrottle(1);sync();}
+    
+    else if(action==='manual'&&canManual()){ui.manual=!ui.manual;if(!ui.manual)mission.setThrottle(1);sync();}
     else if(['fullThrottle','cutThrottle'].includes(action)&&canManual()&&ui.manual&&!loop.paused){mission.setThrottle(action==='fullThrottle'?1:0);sync();}
     else if(action==='fullscreen'){(document.fullscreenElement?document.exitFullscreen():document.querySelector('main').requestFullscreen()).catch(()=>{});}
   });
@@ -72,7 +72,7 @@ export async function bootstrap(){
     const ox=id==='srbLeft'?-6.4:id==='srbRight'?6.4:0,oy=id.startsWith('srb')?27:id==='core'?33:94;
     const c=Math.cos(angle),s=Math.sin(angle),position=[r*Math.sin(theta)+ox*c-oy*s,r*Math.cos(theta)+ox*s+oy*c];
     const velocity=[vr*Math.sin(theta)+vt*Math.cos(theta),vr*Math.cos(theta)-vt*Math.sin(theta)];
-    const ix=side*8,iy=id==='las'?22:-8;debris.release(id,position,velocity,[ix*c-iy*s,ix*s+iy*c],angle,side*.13+(id==='core'?.07:.02));
+    const ix=side*7,iy=id==='las'?22:id==='core'?-18:-5;debris.release(id,position,velocity,[ix*c-iy*s,ix*s+iy*c],angle,-side*.10+(id==='core'?.045:id==='las'?.06:0));
   }
   function updateTrajectory(){const s=mission.state,phase=s.phase;
     if(['ASCENT','PARKING_ORBIT','EDL','DEORBIT'].includes(phase)&&(trajectory.length===0||s.time-(trajectory.at(-1)[2]??0)>2)){
@@ -92,7 +92,7 @@ export async function bootstrap(){
         if(srb&&!a.vehicle.stages[0].attached){release('srbLeft',-1);release('srbRight',1);}
         if(core&&!a.vehicle.stages[1].attached)release('core');if(las&&!a.lasAttached)release('las');
       }
-      if(mission.state.phase!==lastPhase){const phase=mission.state.phase;store.emit('phase',{previous:lastPhase,phase});if(phase==='CRUISE'&&cameras.selected!==1)cameras.select(5);if(phase==='MOI_BURN'&&cameras.selected===5)cameras.select(0);if(['DEORBIT','EDL'].includes(phase))trajectory=[];lastPhase=phase;ui.manual=false;}
+      if(mission.state.phase!==lastPhase){const phase=mission.state.phase;store.emit('phase',{previous:lastPhase,phase});if(phase==='MOI_BURN'&&cameras.selected===5)cameras.select(0);if(['DEORBIT','EDL'].includes(phase))trajectory=[];lastPhase=phase;ui.manual=false;}
       updateTrajectory();currentState=snapshot();
       const visualClock=currentState.missionTime+(currentState.phase==='PRELAUNCH'?countdown.state.time:0);
       if(visualClock-(exhaustHistory.at(-1)?.time??-100)>.2&&((currentState.phase==='ASCENT'&&currentState.stages[0].attached)||(countdown.state.running&&countdown.state.time>=-6.5))){
@@ -134,7 +134,7 @@ export async function bootstrap(){
   let previous=performance.now();graphics.renderer.setAnimationLoop(now=>{const elapsed=Math.max(0,(now-previous)/1000);frameDelta=Math.min(.1,Math.max(.001,elapsed));previous=now;fps=fps*.95+Math.min(120,1/Math.max(.001,elapsed))*.05;
     // Slice long browser frames so event anticipation sees intermediate states.
     if(manualTime||loop.paused)loop.advance(0);
-    else {let left=elapsed;while(left>1e-9){const dt=Math.min(.05,left);direct(dt);left-=dt;loop.advance(dt,left<=1e-9);}if(!elapsed)loop.advance(0);}
+    else {let left=Math.min(elapsed,.1);while(left>1e-9){const dt=Math.min(.05,left);direct(dt);left-=dt;loop.advance(dt,left<=1e-9);}if(!elapsed)loop.advance(0);}
   });
   window.advanceTime=ms=>{manualTime=true;loop.advance(ms/1000);while(!loop.paused&&loop.backlog+1e-12>=SIM_DT)loop.advance(0);};
   window.render_game_to_text=()=>JSON.stringify({ready,titleScreen:ui.title,chapter,watch:ui.watch,about:ui.about,phase:mission.state.phase,camera:cameras.name,cameraIndex:cameras.selected,paused:loop.paused,manualThrottle:ui.manual,help:ui.help,muted:audio.muted,quality:graphics.quality,warp:loop.warp,pacing:{mode:pacing.mode,rate:loop.warp,targetRate:pacing.targetRate},countdown:countdown.state,telemetry:currentState,renderedMissionTime:manager.active?.state?.missionTime,mapLayout:manager.active?.labelLayout,backlogSeconds:loop.backlog,performance:{fps:Math.round(fps),drawCalls:graphics.renderer.info.render.calls,triangles:graphics.renderer.info.render.triangles,...graphics.renderer.info.memory},coordinates:'SI metres; Y-up; floating origin at vehicle, radial tangent basis; maps use scaled distances'});

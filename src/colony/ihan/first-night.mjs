@@ -1,4 +1,3 @@
-import { powerForecast, LED_KW, WATER_KWH_PER_L, ICE_FRACTION, CAPTURE } from "./mars-power.mjs"
 import { AIR_DEFAULTS, createAirState, stepAir } from "./hava.mjs"
 import { WATER_DEFAULTS, createWaterState, stepWater } from "./su.mjs"
 
@@ -13,38 +12,39 @@ export function readLanding(data) {
   return { crew:crew.length, water:supplies.water, oxygen:supplies.oxygen, energy:surfaceEnergy }
 }
 
-export function previewNight(landing, policy, sunlight=.2, lighting="off",branchConnected=true) {
+export function previewNight(landing, policy, sunlight=.2) {
   const hours = 12.33
+  const solar = 420 * sunlight
+  const daylightUse = 60
   const airConfig = {...AIR_DEFAULTS,crew:landing.crew}
-  const waterConfig = {...WATER_DEFAULTS,crew:landing.crew,iceWaterFraction:ICE_FRACTION,captureEfficiency:CAPTURE,litersPerHour:WATER_DEFAULTS.extractionKW/WATER_KWH_PER_L}
+  const waterConfig = {...WATER_DEFAULTS,crew:landing.crew}
   let air = {...createAirState(), oxygenKg:Math.min(airConfig.tankCapacityKg,landing.oxygen)}
   let water = {...createWaterState(), cleanL:Math.min(waterConfig.tankCapacityL,landing.water)}
-  const lampKW=branchConnected?({full:LED_KW,dim:LED_KW*.4,off:0}[lighting]):0
-  const grid=powerForecast(sunlight,branchConnected,{initial:landing.energy,ledKW:lampKW,nightDrill:policy==="water"})
-  const {energy:solar,dayGap:dayShortfall,dusk:atDusk,lifeGap:unservedBase}=grid
-  const greenhouse={energy:0,water:0,litHours:0}
-  const daytimeWater=Math.min(waterConfig.tankCapacityL-water.cleanL,grid.drilling*waterConfig.litersPerHour)
-  water.cleanL+=daytimeWater
-  water.iceKg-=daytimeWater/(ICE_FRACTION*CAPTURE)
-  const irrigationRate=.16
-  const waterReserve=waterConfig.crew*waterConfig.waterPersonDay*hours/24
-  const poweredHours=Math.max(0,hours-unservedBase/6)
-  air=stepAir(air,poweredHours,{powerKW:3.5},airConfig)
-  water=stepWater(water,poweredHours,{powerKW:.3,extract:false},waterConfig)
-  air=stepAir(air,hours-poweredHours,{powerKW:0},airConfig)
-  water=stepWater(water,hours-poweredHours,{powerKW:0,extract:false},waterConfig)
-  const extracted=Math.min(grid.nightDrilling*waterConfig.litersPerHour,waterConfig.tankCapacityL-water.cleanL)
-  water.cleanL+=extracted
-  water.extractedL+=daytimeWater+extracted
-  greenhouse.litHours=Math.min(grid.lit,Math.max(0,water.cleanL-waterReserve)/irrigationRate)
-  greenhouse.water=greenhouse.litHours*irrigationRate
-  greenhouse.energy=greenhouse.litHours*lampKW
-  water.cleanL-=greenhouse.water
-  return {battery:grid.dawn,air,water,solar,atDusk,dayShortfall,unservedBase,greenhouse}
-
+  const dayAvailable = solar + landing.energy
+  const dayShortfall = Math.max(0, daylightUse-dayAvailable)
+  let battery = Math.min(180, Math.max(0,dayAvailable-daylightUse))
+  const atDusk = battery
+  let unservedBase = 0
+  for (let elapsed=0; elapsed<hours; elapsed++) {
+    const dt=Math.min(1,hours-elapsed)
+    const base=Math.min(1,battery/dt)
+    battery-=base*dt
+    unservedBase+=(1-base)*dt
+    const available=Math.max(0,battery/dt)
+    const ventilation=airConfig.fanPowerKW+airConfig.scrubberPowerKW
+    const airFull=ventilation+airConfig.productionPowerKW
+    const extraction=waterConfig.extractionKW+waterConfig.recoveryKW
+    const waterFirst=policy==="water" && available>=ventilation+extraction
+    const airKW=Math.min(available,waterFirst?ventilation:airFull)
+    const waterKW=Math.min(waterFirst?extraction:waterConfig.recoveryKW,available-airKW)
+    air=stepAir(air,dt,{powerKW:airKW},airConfig)
+    water=stepWater(water,dt,{powerKW:waterKW,extract:waterFirst},waterConfig)
+    battery=Math.max(0,battery-(air.powerUsedKW+water.powerUsedKW)*dt)
+  }
+  return { battery, air, water, solar, atDusk, dayShortfall, unservedBase }
 }
 
-export function connectFirstNight(airSystem, waterSystem, sample, greenhouseModel) {
+export function connectFirstNight(airSystem, waterSystem, sample) {
   const panel=document.getElementById("first-night")
   if (!panel) return
   const form=panel.querySelector("form")
@@ -54,20 +54,10 @@ export function connectFirstNight(airSystem, waterSystem, sample, greenhouseMode
   const fmt=new Intl.NumberFormat("tr-TR",{maximumFractionDigits:2})
   let landing=readLanding(sample)
   let loadId=0
-  let branchConnected=true
-  document.addEventListener("mars-breaker",event=>{
-    branchConnected=event.detail
-    if(!branchConnected){
-      greenhouseModel?.setNight(false)
-      waterSystem.update(createWaterState())
-    }
-    report.textContent=""
-  })
   const showLanding=label=>{
     status.textContent=label+" · "+landing.crew+" kişi · "+fmt.format(landing.energy)+" kWh başlangıç · "+
       fmt.format(landing.water)+" L su · "+fmt.format(landing.oxygen)+" kg O₂ kargo"
     report.textContent=""
-    greenhouseModel?.setNight(false)
     airSystem.update(createAirState())
     waterSystem.update(createWaterState())
   }
@@ -94,12 +84,7 @@ export function connectFirstNight(airSystem, waterSystem, sample, greenhouseMode
   form.addEventListener("submit",event=>{
     event.preventDefault()
     const options=new FormData(form)
-    const priority=options.get("priority"), sunlight=Number(options.get("sunlight"))
-    const lighting=branchConnected ? options.get("lighting") ?? "off" : "off"
-    const result=previewNight(landing,priority,sunlight,lighting,branchConnected)
-    greenhouseModel?.setNight(result.greenhouse.litHours>0)
-    const alternate=lighting==="full"?"dim":"full"
-    const comparison=previewNight(landing,priority,sunlight,alternate,branchConnected)
+    const result=previewNight(landing,options.get("priority"),Number(options.get("sunlight")))
     const {air,water}=result
     airSystem.update({...air,producer:air.generatedKg>0})
     waterSystem.update({...water,extractor:water.extractedL>0})
@@ -107,9 +92,6 @@ export function connectFirstNight(airSystem, waterSystem, sample, greenhouseMode
       ["Güneş üretimi",result.solar,"kWh/sol"],
       ["Gün batımında batarya",result.atDusk,"kWh"],
       ["Sabah batarya",result.battery,"kWh"],
-      ["Sera elektrik tüketimi",result.greenhouse.energy,"kWh"],
-      ["Sera sulama tüketimi",result.greenhouse.water,"L"],
-      ["Sera LED çalışma süresi",result.greenhouse.litHours,"saat"],
       ["Temiz su deposu",water.cleanL,"L"],
       ["Oksijen deposu",air.oxygenKg,"kg"],
       ["Kabin CO₂ kütlesi",air.co2Kg,"kg"],
@@ -127,11 +109,6 @@ export function connectFirstNight(airSystem, waterSystem, sample, greenhouseMode
       metric.textContent=fmt.format(value)+" "+unit
       list.append(term,metric)
     }
-    const compare=document.createElement("p")
-    const label=alternate==="dim"?"Kısık LED":"Tam LED"
-    compare.textContent=label+" ile aynı koşullarda sabah "+
-      fmt.format(comparison.battery)+" kWh ve "+fmt.format(comparison.water.cleanL)+
-      " L su kalır. LED "+fmt.format(comparison.greenhouse.litHours)+" saat çalışır."
-    report.replaceChildren(list,...(branchConnected?[compare]:[]))
+    report.replaceChildren(list)
   })
 }

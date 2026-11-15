@@ -11,11 +11,20 @@ export function createFirstPerson(canvas, camera, { onMode, onAim, interact, acc
   let savedFov = camera.fov
   let jump = false, vertical = createSuitMotion()
   let spawnYaw = 0
-  const clearKeys = () => { keys.clear(); jump = false }
+  
+
+  let freeLook=false, headYaw=0;
+  const clearKeys = () => { keys.clear(); jump = false; freeLook=false; headYaw=0 }
+  const applyLook=()=>camera.quaternion.setFromEuler(new T.Euler(look.x,look.y+headYaw,look.z,"YXZ"));
   function turn(dx, dy) {
+    if(freeLook){
+      headYaw=T.MathUtils.clamp(headYaw-dx*.0022,-Math.PI/2,Math.PI/2);
+      applyLook();
+      return;
+    }
     look.y -= dx * .0022
     look.x = T.MathUtils.clamp(look.x - dy * .0022, -1.47, 1.47)
-    camera.quaternion.setFromEuler(look)
+    applyLook()
   }
   function respawn(position, yaw = 0) {
     // Caller supplies an exact, collision-free ground position (no hidden offset).
@@ -43,21 +52,23 @@ export function createFirstPerson(canvas, camera, { onMode, onAim, interact, acc
     camera.fov = value ? 66 : savedFov; camera.updateProjectionMatrix(); onMode(value)
   }
   canvas.addEventListener("click", () => {
-    if (!active) return
-    if (document.pointerLockElement === canvas) interact()
-    else { try { canvas.requestPointerLock?.()?.catch(() => {}) } catch { /* Keyboard look remains available. */ } }
-  }, options)
+    if(active)canvas.focus({preventScroll:true});
+  },options)
   document.addEventListener("mousemove", event => {
-    if (active && (document.pointerLockElement === canvas || (event.target === canvas && event.buttons === 1))) turn(event.movementX,event.movementY)
+    if (active && event.target===canvas && event.buttons===1) turn(event.movementX,event.movementY)
   }, options)
   document.addEventListener("keydown", event => {
-    // Q/Alt belong to the wrist worker: release movement and pointer, leave the event available.
-    if (["KeyQ","AltLeft","AltRight","Escape"].includes(event.code)) {
+    if(active && ["AltLeft","AltRight"].includes(event.code)){
+      freeLook=true;event.preventDefault();return;
+    }
+    // Tablet keys belong to the wrist worker: release movement and pointer, leave the event available.
+    if (["Tab","Escape"].includes(event.code)) {
       clearKeys()
+      canvas.style.cursor="";
       if (document.pointerLockElement === canvas) document.exitPointerLock()
       return
     }
-    if (!active || event.altKey || event.ctrlKey || event.metaKey ||
+    if (!active || event.ctrlKey || event.metaKey ||
       (document.activeElement !== canvas && document.pointerLockElement !== canvas)) return
     if (event.code === "KeyE" && !event.repeat) interact()
     if (event.code === "KeyR" && !event.repeat) accessRoof(lookFrom)
@@ -66,10 +77,21 @@ export function createFirstPerson(canvas, camera, { onMode, onAim, interact, acc
       keys.add(event.code); event.preventDefault()
     }
   }, options)
-  document.addEventListener("keyup", event => keys.delete(event.code), options)
-  document.addEventListener("pointerlockchange", clearKeys, options)
+  document.addEventListener("keyup", event => {
+    keys.delete(event.code);
+    if(["AltLeft","AltRight"].includes(event.code)){freeLook=false;event.preventDefault();}
+  }, options)
+  document.addEventListener("pointerlockchange", () => {
+    clearKeys();
+    const locked=document.pointerLockElement===canvas;
+
+    canvas.style.cursor=locked?"none":"";
+
+  }, options)
   canvas.addEventListener("blur", clearKeys, options); window.addEventListener("blur", clearKeys, options)
   function step(dt) {
+    if(!freeLook){headYaw*=Math.exp(-dt*15);if(Math.abs(headYaw)<.0001)headYaw=0;}
+    applyLook();
     const right = Number(keys.has("KeyD")) - Number(keys.has("KeyA"))
     const forward = Number(keys.has("KeyW")) - Number(keys.has("KeyS"))
     const tx = Number(keys.has("ArrowRight")) - Number(keys.has("ArrowLeft"))
@@ -95,7 +117,7 @@ export function createFirstPerson(canvas, camera, { onMode, onAim, interact, acc
   }
   return {
     get active() { return active },
-    get telemetry() { return {x:camera.position.x,y:camera.position.y,z:camera.position.z,yaw:look.y,pitch:look.x,grounded:vertical.grounded} },
+    get telemetry() { return {x:camera.position.x,y:camera.position.y,z:camera.position.z,grounded:vertical.grounded} },
     setActive, respawn, teleport: lookFrom,
     update(delta, updateAim = true) {
       if (!active) return

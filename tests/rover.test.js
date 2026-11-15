@@ -12,7 +12,7 @@ describe('Perseverance surface operations', () => {
     const s = createRoverState(); commandRover(s, 'drive', 'seitah')
     stepRover(s, .1); expect(s.speedMps).toBe(0); expect(s.odometerM).toBe(0)
     let travelled = 0
-    for (let i = 0; i < 10000; i++) {
+    for (let i = 0; i < 30000; i++) {
       const x = s.x, z = s.z; stepRover(s, .1)
       const d = Math.hypot(s.x - x, s.z - z); travelled += d
       expect(s.speedMps).toBeLessThanOrEqual(ROVER_MAX_SPEED_MPS + 1e-12)
@@ -135,3 +135,8 @@ describe('Perseverance surface operations', () => {
     expect(p).toEqual(target)
   })
 })
+
+it('charges only at the home dock and records transferred grid energy',()=>{const dock=createRoverState();dock.autopilot=false;dock.batteryKWh=1;const before=dock.batteryKWh;stepRover(dock,.1,{dockPowerW:250});expect(dock.docked).toBe(true);expect(dock.chargingW).toBeCloseTo(250);expect(dock.gridEnergyKWh).toBeCloseTo(250*.1/3600000,12);expect(dock.batteryKWh-before).toBeCloseTo((250+110-80)*.1/3600000,12);const away=createRoverState();away.autopilot=false;away.x+=30;away.batteryKWh=1;stepRover(away,.1,{dockPowerW:250});expect(away.chargingW).toBe(0);expect(away.gridEnergyKWh??0).toBe(0);expect(()=>stepRover(away,.1,{dockPowerW:-1})).toThrow();});
+
+it('cancels a manual recall and resumes the prior driving target without resetting battery or position',()=>{const s=createRoverState(2026,{obstacles:[]});commandRover(s,'drive','delta');const target={...s.target};expect(commandRover(s,'return')).toBe(true);expect(s.returnPlan.target).toEqual(target);const [x,z,battery]=[s.x,s.z,s.batteryKWh];expect(commandRover(s,'cancel-return')).toBe(true);expect(s.target).toEqual(target);expect(s.mode).toBe('driving');expect(s.autopilot).toBe(false);expect([s.x,s.z,s.batteryKWh]).toEqual([x,z,battery]);expect(s.returnPlan).toBeNull();});
+it('returns to an interrupted analysis point before restoring its remaining work',()=>{const s=createRoverState(2026,{obstacles:[]});s.autopilot=false;Object.assign(s,{x:ROVER_STATIONS[0].x,z:ROVER_STATIONS[0].z});commandRover(s,'analyze','SuperCam');stepRover(s,.1);const remaining=s.operationRemainingS;commandRover(s,'return');expect(commandRover(s,'cancel-return')).toBe(true);stepRover(s,.1);stepRover(s,.1);expect(s.mode).toBe('analyzing');expect(s.instrumentQueue).toEqual(['SuperCam']);expect(s.operationRemainingS).toBeCloseTo(remaining-.1,8);});

@@ -223,11 +223,21 @@ export function commandRover(state, command, value) {
     state.mode = 'parked'; state.speedMps = 0; state.path.length = 0; state.instrumentQueue.length = 0
     state.operationRemainingS = 0; state.message = 'Rover park edildi.'; return true
   }
+  if(command==='cancel-return'){
+    const plan=state.returnPlan;if(!plan)return reject('İptal edilecek üs dönüşü yok.');
+    const target=plan.mode==='driving'?plan.target:{id:'resume-work',name:'Önceki görev noktası',x:plan.x,z:plan.z};
+    if(target&&!driveTo(state,target))return reject('Önceki işe güvenli rota bulunamadı.');
+    state.autopilot=plan.autopilot;state.campaignPhase=plan.campaignPhase;state.sciencePending=plan.sciencePending;state.samplePending=plan.samplePending;state.returnRequested=false;state.returnPlan=null;
+    if(plan.mode==='analyzing'||plan.mode==='sampling'){state.resumeWork={...plan};state.autopilot=false;}
+    else if(plan.resumeWork){state.resumeWork=plan.resumeWork;state.autopilot=false;}
+    state.message='Üsse dönüş iptal edildi; önceki görev sürdürülüyor.';return true;
+  }
   if (command === 'drive' || command === 'return') {
+    const saved=command==='return'&&!state.returnPlan?structuredClone({x:state.x,z:state.z,mode:state.mode,target:state.target,autopilot:state.autopilot,campaignPhase:state.campaignPhase,sciencePending:state.sciencePending,samplePending:state.samplePending,instrumentQueue:state.instrumentQueue,operationRemainingS:state.operationRemainingS,resumeWork:state.resumeWork??null}):null;
     const target = command === 'return' ? ROVER_HOME : ROVER_STATIONS.find(s => s.id === value)
     if (!target) return reject('Geçerli bir bilim istasyonu seç.')
     if (!driveTo(state,target)) return reject('Güvenli rota bulunamadı.')
-    if(command==='return') { state.autopilot=true; state.campaignPhase='returning'; state.sciencePending=false; state.samplePending=false }
+    if(command==='return') { if(saved)state.returnPlan=saved;state.autopilot=true; state.campaignPhase='returning'; state.sciencePending=false; state.samplePending=false }
     else state.autopilot=false // Legacy commands retained for integration; computer exposes autopilot only.
     return true
   }
@@ -281,17 +291,27 @@ function measure(state, instrument, site) {
   state.message = `${instrument} ölçümü kaydedildi.`
 }
 /** Fixed sim step (caller uses <= .1 s). Warp changes elapsed simulation seconds, never speed limit. */
-export function stepRover(state, dt) {
+// GAME ASSUMPTION: dock charger maximum 250 W; colony adapter reserves the delivered energy.
+export const ROVER_DOCK_CHARGE_W=250;
+export function stepRover(state, dt, {dockPowerW=0}={}) {
   if (!Number.isFinite(dt) || dt < 0 || dt > .100001) throw new RangeError('Rover step must be 0…0.1 s')
+  if(!Number.isFinite(dockPowerW)||dockPowerW<0)throw new RangeError('Invalid dock power');
   if (!dt) return state
   state.elapsedS += dt; state.speedMps = 0; state.yawRateRadS=0; state.wheelAngularSpeedRadS=0; state.steeringRad=0
   state.distanceFromBaseM=distance(state,ROVER_HOME)
   if (state.batteryKWh <= 0 && state.mode !== 'parked') {
     state.mode='parked'; state.path=[]; state.campaignPhase='charging'; state.sciencePending=false; state.samplePending=false
   }
+  if(state.resumeWork&&state.mode==='parked'){
+    const work=state.resumeWork;state.resumeWork=null;state.mode=work.mode;state.instrumentQueue=[...work.instrumentQueue];state.operationRemainingS=work.operationRemainingS;state.target=work.target;state.autopilot=work.autopilot;state.message='Yarıda kalan görev kaldığı yerden sürüyor.';
+  }
+  if(state.returnPlan&&state.campaignPhase==='charging'&&state.distanceFromBaseM<.7)state.returnPlan=null;
   autopilot(state)
   const load = ROVER_LOAD_W[state.mode]
   state.batteryKWh = Math.max(0, Math.min(ROVER_BATTERY_KWH, state.batteryKWh + (ROVER_GENERATOR_W - load) * dt / 3600000))
+  state.docked=state.mode==='parked'&&distance(state,ROVER_HOME)<.7;
+  state.chargingW=0;
+  if(state.docked&&dockPowerW>0){const energy=Math.min(ROVER_BATTERY_KWH-state.batteryKWh,Math.min(ROVER_DOCK_CHARGE_W,dockPowerW)*dt/3600000);state.batteryKWh+=energy;state.chargingW=energy*3600000/dt;state.gridEnergyKWh=(state.gridEnergyKWh??0)+energy;}
   if (state.mode === 'driving') {
     const next = state.path[0]
     if (!next) { state.mode = 'parked'; return state }

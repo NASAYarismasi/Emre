@@ -1,14 +1,14 @@
+import {COMMS_PAD} from '../../data/colonyLayout.js';
 // Crew NPCs: astronauts the player is not controlling walk to real base installations and work there,
 // with a label above the helmet saying what they are doing. Their task follows the role assigned in
 // İhan's colony rules (İnşaat / Bakım / Üretim); with no role they rotate through routine EVA chores.
 import * as T from 'three'
-import { PAD_KEEPOUTS } from '../../data/colonyLayout.js'
 
 // Approach points next to each installation (metres, scene coordinates). Work durations are
 // GAME ASSUMPTIONs for pacing; the chores themselves mirror real surface-ops concerns:
 // dust on solar arrays (NASA Mars surface power), CO₂ scrubber filters, ice-drill wear, crop care.
 export const CREW_SITES = {
-  greenhouse: { x: 19.8, z: 35.6, face: Math.PI, text: 'Serada bitki bakımı · besin çözeltisi ölçümü' },
+  greenhouse: { x: 26.8, z: -.4, face: Math.PI, text: 'Serada bitki bakımı · besin çözeltisi ölçümü' },
   air: { x: 19, z: 9.6, face: Math.PI, text: 'Hava tesisi · CO₂ filtre kontrolü' },
   water: { x: 64, z: -21.4, face: Math.PI, text: 'Su tesisi · buz matkabı bakımı' },
   solar: { x: -40.5, z: 31, face: -Math.PI / 2, text: 'Güneş panelleri · toz temizliği' },
@@ -21,10 +21,11 @@ const ROLE_SITES = {
   construction: ['pad', 'solar'],
 }
 const ROUTINE = ['greenhouse', 'solar', 'air', 'rover', 'water', 'pad']
-// GAME ASSUMPTION: keep-out circles (x, z, radius) for walking: the whole dome+tunnel complex as one circle (three
+// Keep-out circles (x, z, radius) for walking: the whole dome+tunnel complex as one circle (three
 // overlapping dome circles would send a detour from one dome into the next), lander, greenhouse, plants.
-export const CREW_OBSTACLES = [[0, 0, 14.5], ...PAD_KEEPOUTS, [19, 26, 9.2], [19, 6, 3], [64, -26, 3.2]]
+const OBSTACLES = [[COMMS_PAD.x,COMMS_PAD.z,COMMS_PAD.radius+.3], [0, 0, 14.5], [-18, -12, 6.6], [26, -12.6, 8.2], [19, 6, 3], [64, -26, 3.2]]
 const WALK = 1.0 // m/s, suit-limited EVA walking pace (Apollo EVA traverses ≈ 1 m/s)
+
 const STRIDE_HZ = .75 // steps per second per leg at 1 m/s; low gravity → long, slow strides
 
 /** Jointed limbs of team-astronaut-walk.glb (origins at shoulder/hip). Re-read after model swaps. */
@@ -44,7 +45,7 @@ function swing(parts, arms, legsL, legsR) {
 export function planPath(a, b, depth = 0) {
   if (depth > 3) return [b]
   const dx = b.x - a.x, dz = b.z - a.z, length2 = dx * dx + dz * dz || 1
-  for (const [cx, cz, r] of CREW_OBSTACLES) {
+  for (const [cx, cz, r] of OBSTACLES) {
     const t = Math.max(0, Math.min(1, ((cx - a.x) * dx + (cz - a.z) * dz) / length2))
     const px = a.x + dx * t, pz = a.z + dz * t
     if (Math.hypot(px - cx, pz - cz) >= r || t <= 0 || t >= 1) continue
@@ -69,7 +70,7 @@ function makeLabel() {
   const texture = new T.CanvasTexture(canvas); texture.colorSpace = T.SRGBColorSpace
   const sprite = new T.Sprite(new T.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, sizeAttenuation: false }))
   // Fixed on-screen size (sizeAttenuation off) so the task stays readable from the overview camera.
-  sprite.scale.set(.34, .0595, 1); sprite.position.y = 2.4; sprite.renderOrder = 10
+  sprite.scale.set(.2, .035, 1); sprite.position.y = 2.35; sprite.renderOrder = 10
   sprite.raycast = () => {}
   let current = ''
   return { sprite, set(title, text) {
@@ -87,24 +88,56 @@ function makeLabel() {
   }, dispose() { texture.dispose(); sprite.material.dispose() } }
 }
 
+function makeHeadlamp(actor) {
+  const mount = new T.Group()
+  mount.name = 'Crew helmet lamp'
+  mount.position.set(0, 1.77, .19)
+  const lamp = new T.SpotLight(0xffefd5, 0, 20, Math.PI / 7, .55, 2)
+  lamp.target.position.set(0, -1.1, 4)
+  const housing = new T.Mesh(new T.BoxGeometry(.14, .07, .09),
+    new T.MeshStandardMaterial({color: 0x3e474b}))
+  housing.raycast = () => {}
+  const lens = new T.Mesh(new T.BoxGeometry(.105, .038, .012),
+    new T.MeshBasicMaterial({color: 0x657078}))
+  lens.position.z = .049
+  lens.raycast = () => {}
+  mount.add(lamp, lamp.target, housing, lens)
+  actor.add(mount)
+  return {
+    mount,
+    get on() { return lamp.intensity > 0 },
+    update(equipped, night) {
+      if (mount.parent !== actor) actor.add(mount)
+      housing.visible = lens.visible = equipped
+      lamp.intensity = equipped && night ? 34 : 0
+      lens.material.color.setHex(lamp.intensity > 0 ? 0xfff0d1 : 0x657078)
+    },
+    dispose() {
+      mount.removeFromParent()
+      lamp.dispose()
+      for (const part of [housing, lens]) { part.geometry.dispose(); part.material.dispose() }
+    },
+  }
+}
+
 export function createCrewAgents({ crewModels, groundY }) {
   const agents = new Map()
   for (const [index, actor] of crewModels) {
     const label = makeLabel(); actor.add(label.sprite)
-    agents.set(index, { actor, label, path: [], site: null, mode: 'idle', timer: 2 + index * 3, visit: 0, phase: index })
+    agents.set(index, { actor, label, headlamp: makeHeadlamp(actor), path: [], site: null, mode: 'idle', timer: 2 + index * 3, visit: 0, phase: index })
   }
   const target = new T.Vector3()
   return {
     /** dt in real seconds; `speed` lets the colony time warp hurry the crew a little (capped). */
-    update(dt, { state, playerId, fpsActive, camera, speed = 1 }) {
+    update(dt, { state, playerId, fpsActive, camera, night = false, speed = 1 }) {
       const step = dt * Math.min(Math.max(speed, 1), 8)
       state.crew.forEach((person, index) => {
         const agent = agents.get(index)
         if (!agent) return
-        const { actor, label } = agent
+        const { actor, label, headlamp } = agent
+        headlamp.update(person.health > 0 && person.id !== playerId, night)
         // İhan's character loader clears the actor's children when the NASA suit GLB arrives.
-        if (label.sprite.parent !== actor) { actor.add(label.sprite); agent.parts = null }
-        if (!agent.parts || !agent.parts.armL.length) agent.parts = limbs(actor)
+        if (label.sprite.parent !== actor) {actor.add(label.sprite);agent.parts=null}if(!agent.parts||!agent.parts.armL.length)agent.parts=limbs(actor)
         actor.rotation.order = 'YXZ'
         const name = 'Astronot ' + (index + 1)
         if (person.health <= 0) { label.sprite.visible = false; return }
@@ -112,11 +145,10 @@ export function createCrewAgents({ crewModels, groundY }) {
           // The player's body follows the camera in FPS so that switching astronaut keeps continuity.
           if (fpsActive) { actor.position.set(camera.position.x, groundY(camera.position.x, camera.position.z), camera.position.z); agent.mode = 'idle'; agent.path = [] }
           label.set(name + ' · Sen', 'Kontrol sende')
-          label.sprite.visible = !fpsActive && actor.position.distanceTo(camera.position) < 45
+          label.sprite.visible = !fpsActive
           return
         }
-        // GAME ASSUMPTION: nearby work labels only; long-distance banners hid the whole base from the arrival pad.
-        label.sprite.visible = actor.position.distanceTo(camera.position) < 45
+        label.sprite.visible = true
         agent.phase += step
         if (agent.mode === 'idle' || (agent.mode === 'working' && (agent.timer -= step) <= 0)) {
           agent.site = nextSite(person.role, agent.site, index, agent.visit++)
@@ -137,27 +169,20 @@ export function createCrewAgents({ crewModels, groundY }) {
             actor.rotation.y = Math.atan2(dx, dz)
           }
           actor.rotation.x = 0
-          // Low-g gait: slow strides, legs ±24°, arms counter-swinging ±16°, slight float (g = 3.71 m/s²).
-          const s = Math.sin(agent.phase * Math.PI * 2 * STRIDE_HZ)
-          swing(agent.parts, s * .28, s * .42, -s * .42)
-          actor.position.y = groundY(actor.position.x, actor.position.z) + Math.abs(s) * .045
+          // Low-g gait: slow, slightly floaty steps (Mars g = 3.71 m/s²).
+          const s=Math.sin(agent.phase*Math.PI*2*STRIDE_HZ);swing(agent.parts,s*.28,s*.42,-s*.42);actor.position.y=groundY(actor.position.x,actor.position.z)+Math.abs(s)*.045
           label.set(name + ' · Yolda', site.text.split(' · ')[0] + ' için yürüyor')
         } else if (agent.mode === 'working') {
           // Slow lean in and out, as if inspecting/handling hardware at chest height.
           actor.position.y = groundY(actor.position.x, actor.position.z)
-          actor.rotation.x = .06 + Math.sin(agent.phase * 1.3) * .04
-          // Hands forward at chest height working on the hardware, small alternating motions.
-          const w = Math.sin(agent.phase * 2.1)
-          for (const o of agent.parts.armL) o.rotation.x = -.95 + w * .18
-          for (const o of agent.parts.armR) o.rotation.x = -.95 - w * .18
-          for (const o of [...agent.parts.legL, ...agent.parts.legR]) o.rotation.x = 0
+          actor.rotation.x=.06+Math.sin(agent.phase*1.3)*.04;const w=Math.sin(agent.phase*2.1);for(const o of agent.parts.armL)o.rotation.x=-.95+w*.18;for(const o of agent.parts.armR)o.rotation.x=-.95-w*.18;for(const o of [...agent.parts.legL,...agent.parts.legR])o.rotation.x=0
           label.set(name + (person.role ? ' · ' + { production: 'Üretim', maintenance: 'Bakım', construction: 'İnşaat' }[person.role] : ''), site.text)
         }
       })
     },
     get telemetry() {
-      return [...agents].map(([index, a]) => ({ index, mode: a.mode, site: a.site, x: +a.actor.position.x.toFixed(2), z: +a.actor.position.z.toFixed(2) }))
+      return [...agents].map(([index, a]) => ({ index, headlamp: a.headlamp.on, mode: a.mode, site: a.site, x: +a.actor.position.x.toFixed(2), z: +a.actor.position.z.toFixed(2) }))
     },
-    dispose() { for (const a of agents.values()) { a.label.sprite.removeFromParent(); a.label.dispose() } },
+    dispose() { for (const a of agents.values()) { a.label.sprite.removeFromParent(); a.label.dispose(); a.headlamp.dispose() } },
   }
 }

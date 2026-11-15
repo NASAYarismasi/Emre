@@ -75,9 +75,6 @@ Bulut alfa haritası, scrub/beton/folyo/kum dokuları, LC-39B geometrisi, Mars a
 Koloni kuralları, kaynak miktarları, tarım ve atölye değerleri eğitsel oyun birimleridir (İhan, `MARS-ENTEGRASYON.md`). Uçuştan koloniye birim dönüşümü: `src/sim/landingPayload.js` (1 birim = bir astronotun bir sollük ihtiyacı, NASA BVAD oranlarıyla).
 
 <!-- SYNC: procedural surface provenance; no external imagery added. -->
-<!-- LAYOUT: the surface comms mast, gimbal dish, guy anchors, cable jackets, soft beacon texture,
-     blast-swept decal, footpad prints and EVA waymarkers are original procedural project artwork.
-     No downloaded model, photograph, font, or third-party texture was added for this layout pass. -->
 `src/colony/scene/crater-terrain.mjs` ve `regolith-detail.mjs`, İhan’ın `kaynak/src/crater-ecosystem.mjs` içindeki prosedürel krater profilleri ve 512² regolit detay üreticisinden uyarlanmıştır. Merkezde 60 m çaplı düz oyun sahası, dışta yassı taşlar ve seyreltilmiş instanced çakıl halısı vardır. Yerel yükseklikler ölçülmüş Jezero DEM’i değildir. Mevcut MOLA tabanlı bölgesel ufuk ve YÜZEY’in Mars24 ortamı korunur; HiRISE ortofotosu veya ikinci gökyüzü/ışık sistemi eklenmedi.
 
 ## Düz Ova entegrasyonu (OVA, 2026-11-14)
@@ -95,9 +92,13 @@ Düz Ova, yukarıda tarihsel olarak anlatılan MOLA bölgesel ufku / krater ekos
 
 Rover lens adaptation: `src/colony/ova/assets.mjs` disables screen-space transmission on three tiny NASA camera-lens materials and uses translucent glass instead. Meshes, textures, scales and source GLB bytes are unchanged; this removes an extra whole-scene refraction pass on software GL.
 
-| `public/models/colony/team-astronaut-walk.glb` | NASA astronaut suit (`public/assets/astronaut.glb`), arms lowered and split into shoulder/hip-jointed limbs by `scripts/pose-walker.py` (Blender) | Same source licence as astronaut.glb |
+## Selective Emre integration (097c3aa)
 
-<!-- // TABLET: original layered SVG artwork provenance. -->
-`public/art/eva-tablet-grip-back.svg` ve `eva-tablet-grip-front.svg`: bu proje için çizilen özgün EVA eldivenleri, manşetler ve kumaş detayları; [CC0 1.0](https://creativecommons.org/publicdomain/zero/1.0/). Harici görsel veya NASA modelinden türetilmedi; ekipman oranları temsili oyun tasarımıdır. Tablet kasası CSS ile çizilir, ARES ekran tasarımı Samet'indir.
+- `team-astronaut-walk.glb`: NASA astronaut derivative with articulated shoulder/hip groups; prepared by Emre (`scripts/pose-walker.py` in source branch), same NASA media conditions as the original astronaut.
+- `perseverance-wheels.glb`: existing NASA/JPL Perseverance model with separated wheel hubs; prepared by Emre (`scripts/split-rover-wheels.py`), original NASA conditions retained.
+- `public/art/eva-tablet-grip-*.svg`: Emre branch original EVA grip artwork, CC0 1.0. Samet display and local notifications retained.
+- Communications tower, facility computers and particle effects: team procedural source from Emre `feature/pro-rebuild` commit 097c3aa; local facility positions and original resource calculations preserved.
 
-İhan birleştirmesi (`a7d5ce6` → `ed79956`, 2026-11-15): `src/colony/ihan/` içindeki yeni inverter/kablo/kabin modelleri, fırçalı metal kapı dokuları ve basınç sesi İhan'ın ekip içi prosedürel kaynaklarıdır. Harici görsel/ses veya base64 varlık eklenmedi. Mevcut NASA modellerinin dosyaları ve lisansları korunur. Ayrıntılı kaynak ve uyarlama kaydı: [IHAN-MERGE.md](docs/IHAN-MERGE.md).
+Battery enclosure and cable terminal geometry: adapted visual portions of Emre/İhan solar-farm and power-cables sources at 097c3aa. Their new microgrid rules are not imported. Long cable runs are buried and not drawn. Rover dock is a new procedural concept; 250 W charging is a game assumption, with delivered kWh deducted from the existing support energy budget.
+
+Power integration preview uses NASAYarismasi/-lhan branch son, commit 97bc753. Original power, panel-production, recovery and projection modules preserved.

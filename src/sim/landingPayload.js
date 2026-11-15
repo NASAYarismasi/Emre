@@ -1,8 +1,9 @@
+import { MARS_SOL_SECONDS } from './marsSun.js';
 import { CREW_RATES } from '../data/sls.js';
 import { DAY } from './constants.js';
 
 // Mean Mars solar day (sol), s. https://nssdc.gsfc.nasa.gov/planetary/factsheet/marsfact.html (24.6597 h)
-export const SOL = 24.6597 * 3600;
+export const SOL = MARS_SOL_SECONDS;
 
 // GAME ASSUMPTION (architecture after NASA DRA 5.0, https://ntrs.nasa.gov/citations/20090012109):
 // consumables for the return trip stay aboard the transit habitat in Mars orbit; the crew lander

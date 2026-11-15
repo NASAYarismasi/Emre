@@ -58,3 +58,11 @@
 @media(max-width:370px){.ares-arm{scale:.46;bottom:-55px}}
 @media(max-height:600px) and (min-width:761px){.ares-arm{scale:.78;bottom:-78px}}
 @media(prefers-reduced-motion:reduce){.ares-arm,.ares-wrist.is-raised .ares-arm{transition:opacity .12s}.is-raised .ares-hold{animation:none}}
+
+.ares-notice{display:none;color:#ffdfad;font:13px/1.6 monospace;margin:12px 0;padding:10px;border:1px solid #bd752c;background:#241912;overflow-wrap:anywhere}
+.has-notice .ares-notice{display:block}
+.ares-wrist.is-peeking:not(.is-raised) .ares-arm{transform:translateY(42%) rotate(-3deg) scale(.75);opacity:1;visibility:visible;transition:transform .65s cubic-bezier(.2,.8,.2,1),opacity .25s,visibility 0s}
+.is-peeking:not(.is-raised) .ares-content,.is-peeking:not(.is-raised) .ares-tabs,.is-peeking:not(.is-raised) .ares-footer,.is-peeking:not(.is-raised) .ares-close{visibility:hidden}
+.ares-colony-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:8px}.ares-colony-actions button{font:10px monospace;background:#241b12;border:1px solid #a86a2c;color:#ffd9ad;padding:6px}
+.is-peeking .ares-colony-actions{visibility:hidden}
+@media(prefers-reduced-motion:reduce){.ares-wrist.is-peeking:not(.is-raised) .ares-arm{transition:opacity .12s}}

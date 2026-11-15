@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="tr">
 <head>
  <meta charset="utf-8">
@@ -37,8 +37,6 @@
     <button type="button" id="view-toggle" data-drawer="view-drawer" aria-controls="view-drawer" aria-expanded="false"><span>06</span> Görünüm / yardım</button>
     <button type="button" id="eclss-toggle" data-drawer="eclss-drawer" aria-controls="eclss-drawer" aria-expanded="false"><span>08</span> ECLSS dengesi</button>
     <button type="button" id="life-toggle" data-drawer="life-drawer" aria-controls="life-drawer" aria-expanded="false"><span>09</span> Yaşam destek tesisleri</button>
-    <!-- DASHBOARD: G shortcut is owned by the mounted dashboard observer. -->
-    <button type="button" id="dashboard-toggle" aria-controls="mission-dashboard" aria-expanded="false" aria-keyshortcuts="G"><span>10</span> Görev paneli</button>
    </nav>
    <section id="resources-drawer" class="colony-drawer" aria-labelledby="resources-toggle" hidden>
     <header class="drawer-heading"><h2>Stok ve enerji</h2><button type="button" data-close-drawer aria-label="Kaynakları kapat">×</button></header>
@@ -107,26 +105,8 @@
      <dl class="eclss-results"><dt>O₂ rezervi</dt><dd id="life-oxygen">—</dd><dt>O₂ üretildi</dt><dd id="life-produced">—</dd><dt>O₂ tüketildi</dt><dd id="life-consumed">—</dd><dt>CO₂ uzaklaştırıldı</dt><dd id="life-co2">—</dd></dl>
      <h3>Su tesisi / Buz ve geri kazanım</h3>
      <dl class="eclss-results"><dt>Temiz su rezervi</dt><dd id="life-water">—</dd><dt>Buzdan çıkarıldı</dt><dd id="life-extracted">—</dd><dt>Geri kazanıldı</dt><dd id="life-recycled">—</dd><dt>Güç / ayrılabilir güç</dt><dd id="life-power">—</dd></dl>
-     <p class="unit-note">420 panel, 10 inverter ve 180 kWh batarya fiziksel tesisleri besler. Şalterleri güç dağıtımı bilgisayarından yönet. Fırtınada geçirgenlik %20’ye düşer (oyun varsayımı). Başlangıçta 1 iniş enerji birimi = 12 kWh kabul edilir; fiziksel rezervler koloni oyun stoklarından ayrı izlenir.</p>
-     <div class="buttons"><button type="button" data-ova-view="greenhouse">Serayı gör</button><button type="button" data-ova-view="air">Hava tesisi</button><button type="button" data-ova-view="water">Su tesisi</button></div>
-     <div class="group" id="power-mission"><!-- İhan 96b5438: power mission -->
-<h3>Görev · Mars’ta elektriği üret ve depola</h3>
-<p>İlk sol açık, sonraki iki sol toz fırtınalı. İlk gün ürettiğin elektriği bataryaya aktar. Üç sol boyunca yaşam desteğini çalıştır ve son sabaha en az 10 kWh rezervle ulaş.</p>
-<button id="power-farm" type="button">Güneş tarlasını incele</button>
-<form>
-<label>Devredeki güneş masası <input name="tables" type="number" min="1" max="42" value="36" required></label>
-<label>Devredeki batarya paketi <input name="packs" type="number" min="1" max="8" value="4" required></label>
-<label><input type="checkbox" name="lights" checked> Gece seraya elektrik ayır</label>
-<label><input type="checkbox" name="drill"> Gündüz sondajı çalıştır</label><button type="submit">Üret, depola ve görevi çalıştır</button>
-</form>
-<output aria-live="polite"></output>
-<details><summary>Görev modelinin varsayımları</summary><p>Görev 8 kWh iniş rezerviyle başlar. Bir masa açık havada 10 kWh/sol üretir, fırtınada üretim %80 düşer. Ortak AC bara gündüz habitatı besler ve gece rezervini doldurur. Esnek yükler ve kalan şarj aynı enerji modeline göre dağıtılır. Paket başına 45 kWh kullanılabilir kapasite vardır. Gece yaşam desteği 12,33 saat boyunca 6 kW ister. Kalan enerji seçilirse 3,37 kW sera ışığına gider. Bu görev, ilk gece hesabından bağımsız bir senaryodur.</p></details>
-</div>
-     <h3>Tesis bilgisayarları</h3>
-     <p class="muted">Her tesisin yanındaki bilgisayara yürüyüp E’ye bas ya da buradan aç. Kapattığın birim hesaptan da çıkar.</p>
-     <div class="buttons"><button type="button" data-console="air">Hava tesisi bilgisayarı</button><button type="button" data-console="water">Su tesisi bilgisayarı</button><button type="button" data-console="greenhouse">Sera bilgisayarı</button><button type="button" data-console="power">Güç dağıtımı</button><button type="button" data-ova-view="power">Güç hatlarını gör</button></div>
-     <!-- // ROVER: shared facility computer panel. -->
-     <div class="buttons"><button type="button" data-console="rover">Rover bilgisayarı</button></div>
+     <p class="unit-note">Diğer koloni yüklerinden kalan enerji kullanılır. Açık güç bağlantısı varsayımı: 1 oyun enerji birimi = 12 kWh. Fiziksel tesis rezervleri koloni oyun stoklarından ayrı izlenir; 3B güneş tarlası kendiliğinden enerji kredisi vermez.</p>
+     <div class="buttons"><button type="button" data-ova-view="greenhouse">Serayı gör</button><button type="button" data-ova-view="air">Hava tesisi</button><button type="button" data-ova-view="water">Su tesisi</button><button type="button" data-ova-view="comms">Haberleşme kulesi</button></div><div class="buttons"><button type="button" data-console="air">Hava tableti</button><button type="button" data-console="water">Su tableti</button><button type="button" data-console="greenhouse">Sera tableti</button><button type="button" data-console="habitat">Yaşam alanı tableti</button><button type="button" data-console="solar">Güneş tableti</button><button type="button" data-console="rover">Rover tableti</button></div>
      <div class="group"><h3>Sera / Hava kilidi</h3><p>Seranın ön kapısına yaklaş ve bak. E ile hava kilidine gir; basınç döngüsü tamamlanınca ikinci kapıyı E ile aç. İçeride WASD ile yürü. Çıkış aynı sırayı izler. Güneş ufkun altına indiğinde mor LED’ler açılır.</p></div>
      <details class="group"><summary>ℹ Bilimsel sınırlar ve varsayımlar</summary>
       <p>Hava: 0,108 kg O₂/saat, 2,7 kW. Dokuz küçük MOXIE’nin zirve üretiminin sürekli sağlandığı varsayılır; bu tesis Mars’ta doğrulanmış değildir. Fan 0,3 kW, CO₂ giderimi 0,5 kW ön tasarım değerleridir. CO₂ kütlesi ppm veya güvenlik göstergesi değildir.</p>
@@ -151,9 +131,7 @@
     <header class="drawer-heading"><h2>Görünüm ve kontroller</h2><button type="button" data-close-drawer aria-label="Görünümü kapat">×</button></header>
     <div class="drawer-content">
      <div class="mode-row"><button id="view-mode" class="primary" type="button">Astronotun gözünden gez</button><label>Astronot <select id="player" aria-label="Bakış açısı için astronot"></select></label></div>
-     <div class="buttons" aria-label="Düz Ova kameraları"><button type="button" data-ova-view="panorama">Ova panoraması</button><button type="button" data-ova-view="base">Kubbe üssü</button><button type="button" data-ova-view="solar">Güneş tarlası</button><button type="button" data-ova-view="comms">Baz istasyonu</button><button type="button" data-ova-view="lander">İniş alanı</button><button type="button" data-ova-view="overview">Üs yerleşimi</button><button type="button" data-ova-view="pad">Kurulum alanı</button></div>
-     <!-- SAMET-HAB: Samet's habitat views, NASAYarismasi/Samet 4c88580. -->
-     <div class="buttons" aria-label="Yaşam alanı odaları"><button type="button" data-ova-view="controlRoom">Ana oda</button><button type="button" data-ova-view="bedroom">Yatak odası</button><button type="button" data-ova-view="laboratory">Laboratuvar</button><button type="button" data-ova-view="sanitary">Tuvalet</button></div>
+     <div class="buttons" aria-label="Düz Ova kameraları"><button type="button" data-ova-view="panorama">Ova panoraması</button><button type="button" data-ova-view="base">Kubbe üssü</button><button type="button" data-ova-view="solar">Güneş tarlası</button><button type="button" data-ova-view="pad">Kurulum alanı</button><button type="button" data-ova-view="controlRoom">Ana oda</button><button type="button" data-ova-view="bedroom">Yatak odası</button><button type="button" data-ova-view="laboratory">Laboratuvar</button><button type="button" data-ova-view="sanitary">Tuvalet</button></div>
      <p class="muted">Merkez kubbenin önündeki hava kilidine yaklaş ve E’ye bas. İçeride yan tünellerden diğer kubbelere geç; çıkmak için merkez kubbenin kapısına dön.</p>
      <p id="view-help">Modülü seç ve zeminde veya çatıda istediğin noktaya tıkla · Sürükleyerek döndür</p>
      <p class="muted">Sahneye tıkla: fareyi yakala · WASD: yürü · Oklar / fare: bak · E: etkileşim · R: yaşam modülünün çatısına eriş / geri dön · Esc: paneli kapat veya üs planına dön.</p>

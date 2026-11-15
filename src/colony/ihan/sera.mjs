@@ -10,7 +10,7 @@ export function createGreenhouse(scene){
  const green=new T.MeshStandardMaterial({color:0x447f2d,roughness:.7,side:T.DoubleSide});
  const darkGreen=new T.MeshStandardMaterial({color:0x294e1d,roughness:.8,side:T.DoubleSide});
  const red=new T.MeshStandardMaterial({color:0xbb4327,roughness:.45});
- const leds=[];const shell=new T.Group();group.add(shell);let night=false;
+ const leds=[];const shell=new T.Group();group.add(shell);let night=false;let irrigation=false;
  k.box(10.6,.25,12.6,0,.08,0,'dark');k.box(2.1,.04,12.1,0,.23,0,'steel');
  for(const x of [-5,5])k.box(.2,1.2,12.2,x,.75,0,'white',shell);
  const arc=z=>Array.from({length:49},(_,i)=>{const a=i/48*Math.PI;return [Math.cos(a)*5,1.35+Math.sin(a)*3.5,z]});
@@ -36,13 +36,14 @@ export function createGreenhouse(scene){
   k.box(width,lo-bottom,.16,0,(lo+bottom)/2,z,hatchMaterial,hatch);
   k.box(width,top-hi,.16,0,(top+hi)/2,z,hatchMaterial,hatch);
   for(const side of [-1,1])k.box((width-windowW)/2,windowH,.16,side*(width+windowW)/4,windowY,z,hatchMaterial,hatch);
-  k.box(windowW,windowH,.045,0,windowY,z,transparent,hatch);
+  const insert=new T.Shape();insert.moveTo(-windowW/2,-windowH/2);insert.lineTo(windowW/2,-windowH/2);insert.lineTo(windowW/2,windowH/2);insert.lineTo(-windowW/2,windowH/2);insert.closePath();const aperture=new T.Path();aperture.absarc(0,0,.22,0,Math.PI*2,true);insert.holes.push(aperture);const insertMat=hatchMaterial.clone();insertMat.side=T.DoubleSide;k.mesh(new T.ExtrudeGeometry(insert,{depth:.16,bevelEnabled:false}),insertMat,0,windowY,z-.08,hatch);
+  for(const face of [-1,1]){const disc=k.mesh(new T.CircleGeometry(.22,48),transparent,0,windowY,z+face*.09,hatch);disc.rotation.y=face<0?Math.PI:0;const rim=k.mesh(new T.TorusGeometry(.235,.025,10,48),'steel',0,windowY,z+face*.12,hatch);}
   for(const face of [-1,1]){
    const zz=z+face*.105;
    for(const x of [-width/2+.045,width/2-.045])k.box(.065,height,.045,x,bottom+height/2,zz,'steel',hatch);
    for(const y of [bottom+.04,top-.04])k.box(width,.065,.045,0,y,zz,'steel',hatch);
-   for(const x of [-windowW/2-.035,windowW/2+.035])k.box(.065,windowH+.14,.045,x,windowY,zz,'dark',hatch);
-   for(const y of [lo-.035,hi+.035])k.box(windowW+.14,.065,.045,0,y,zz,'dark',hatch);
+   
+   
    k.box(.065,.42,.10,width*.34,1.27,zz+face*.07,'steel',hatch);
    for(const y of [1.06,1.48])k.box(.10,.065,.13,width*.34,y,zz+face*.025,'dark',hatch);
    k.box(width*.68,.20,.025,0,.58,zz,'dark',hatch);
@@ -57,7 +58,7 @@ export function createGreenhouse(scene){
  k.box(1.85,.035,2.7,0,.26,7.4,'steel',lock);
  for(const x of [-1.25,1.25]){
   k.box(.16,.9,2.8,x,.7,7.4,'white',lock);k.box(.16,.48,2.8,x,2.76,7.4,'white',lock);
-  k.box(.065,1.34,2.38,x,1.82,7.4,transparent,lock);
+  const wallShape=new T.Shape();wallShape.moveTo(-1.19,-.67);wallShape.lineTo(1.19,-.67);wallShape.lineTo(1.19,.67);wallShape.lineTo(-1.19,.67);wallShape.closePath();const hole=new T.Path();hole.absarc(0,.08,.28,0,Math.PI*2,true);wallShape.holes.push(hole);const sideWall=k.mesh(new T.ExtrudeGeometry(wallShape,{depth:.065,bevelEnabled:false}),'white',x-.0325,1.82,7.4,lock);sideWall.rotation.y=Math.PI/2;for(const face of [-1,1]){const cover=k.mesh(new T.CircleGeometry(.28,48),transparent,x+face*.045,1.9,7.4,lock);cover.rotation.y=face*Math.PI/2;const rim=k.mesh(new T.TorusGeometry(.29,.035,10,48),'steel',x+face*.06,1.9,7.4,lock);rim.rotation.y=Math.PI/2;}
   for(const z of [6.04,7.4,8.76])k.box(.18,2.7,.10,x,1.62,z,'steel',lock);
   k.pipe([[x*.8,.7,6.35],[x*.8,.7,8.4]],.035,'steel',lock);
  }
@@ -129,6 +130,6 @@ export function createGreenhouse(scene){
  leaves.count=leafCount;stems.count=stemCount;grains.count=grainCount;plugs.count=plugCount;for(const o of [leaves,stems,grains,plugs]){o.castShadow=true;o.receiveShadow=true;group.add(o);}
  for(let row=0;row<3;row++){const rz=-3.8+row*3.35-1.1;k.pipe([[1.85,.83,rz],[4.25,.83,rz]],.035,'blue');}k.pipe([[4.25,.83,-5],[4.25,.83,4.8]],.045,'blue');k.box(1.2,1.2,.9,2.85,.88,5.2,'white');k.pipe([[4.25,.83,4.8],[4.25,.83,5.2],[3.46,.83,5.2]],.045,'blue');k.flange(3.46,.83,5.2,'x');
  const light=new T.PointLight(0xb46eff,0,12,2);light.position.set(-3.2,2.4,0);group.add(light);
- return {group,door,setAirlock(innerOpen,outerOpen,cycling=false){door.position.x=innerOpen?-1.96:0;outerDoor.position.x=outerOpen?2.1:0;indicator.color.set(cycling?0xe5a44b:0x63b8a2);indicator.emissive.set(cycling?0xda7a16:0x36b888)},setNight(value){night=value;leds.forEach(m=>{m.emissiveIntensity=value?2.5:0;m.color.set(value?0xd3b7eb:0xc6cbc5)});plantLights.forEach(l=>l.intensity=value?4:0);light.intensity=value?8:0},setRoof(value){shell.visible=value},setDoor(open){door.position.x=open?-1.96:0},frame(time){const d=new T.Object3D();for(const b of bubbles){for(let i=0;i<28;i++){d.position.set(b.x+Math.sin(i*7)*.39,.65+((i/28+time*.05)%1)*1.95,b.z+Math.cos(i*9)*.39);d.updateMatrix();b.mesh.setMatrixAt(i,d.matrix)}b.mesh.instanceMatrix.needsUpdate=true;}},dispose(){metalTexture.dispose();hatchMaterial.dispose();fabricTexture.dispose();membrane.dispose();leafTexture.dispose();k.dispose()}};
+ return {group,door,setAirlock(innerOpen,outerOpen,cycling=false){door.position.x=innerOpen?-1.96:0;outerDoor.position.x=outerOpen?2.1:0;indicator.color.set(cycling?0xe5a44b:0x63b8a2);indicator.emissive.set(cycling?0xda7a16:0x36b888)},setNight(value){night=value;leds.forEach(m=>{m.emissiveIntensity=value?2.5:0;m.color.set(value?0xd3b7eb:0xc6cbc5)});plantLights.forEach(l=>l.intensity=value?4:0);light.intensity=value?8:0},setIrrigation(value){irrigation=Boolean(value)},get irrigation(){return irrigation},get lightsOn(){return night},setRoof(value){shell.visible=value},setDoor(open){door.position.x=open?-1.96:0},frame(time){const d=new T.Object3D();for(const b of bubbles){for(let i=0;i<28;i++){d.position.set(b.x+Math.sin(i*7)*.39,.65+((i/28+time*.05)%1)*1.95,b.z+Math.cos(i*9)*.39);d.updateMatrix();b.mesh.setMatrixAt(i,d.matrix)}b.mesh.instanceMatrix.needsUpdate=true;}},dispose(){metalTexture.dispose();hatchMaterial.dispose();fabricTexture.dispose();membrane.dispose();leafTexture.dispose();k.dispose()}};
 }
 

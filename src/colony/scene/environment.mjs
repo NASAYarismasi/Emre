@@ -40,7 +40,6 @@ export function createEnvironment(scene, camera, canvas) {
   let unixSeconds = EPOCH, warpIndex = 0, lastSol = 0, lastEmission = -Infinity, realTime = 0
   let solar = marsSun(unixSeconds), manualLamp = null, lampOn = false, storm = false, isFPS = false
   let latestLifeSupport = null // IHAN-SRC: read-only vendor plant telemetry
-  let latestRover = null // ROVER: full, read-only science telemetry.
   let latestState, activeTask = null, lastSnapshot = '', lastHUD = -Infinity
   const warps = [1,10,60]
   const abort = new AbortController()
@@ -58,7 +57,7 @@ export function createEnvironment(scene, camera, canvas) {
   }))
   sky.renderOrder = -100; sky.frustumCulled = false; skyRoot.add(sky)
   const haze = new T.Color()
-  const coolSun = new T.Color(0xf1f2ff), clearHaze = new T.Color(0xb28a6c), stormHaze = new T.Color(0x725038)
+  const coolSun = new T.Color(0xf1f2ff), nightHaze = new T.Color().setRGB(.002,.003,.006), clearHaze = new T.Color(0xb28a6c), stormHaze = new T.Color(0x725038)
   scene.background = new T.Color(0x030408)
   scene.fog = new T.FogExp2(0x926c50,.00008)
   const ambient = new T.HemisphereLight(0xf6cba1,0x514137,1)
@@ -142,7 +141,7 @@ export function createEnvironment(scene, camera, canvas) {
   document.addEventListener('keydown',event=>{
     if(event.repeat || event.ctrlKey || event.metaKey || event.altKey || /INPUT|TEXTAREA|SELECT/.test(event.target?.tagName) || event.target?.isContentEditable) return
     if(event.code==='KeyL') { manualLamp=!lampOn; updateLighting(true); emit(true) }
-    if(event.code==='KeyM') toggleAudio()
+
     if(event.code==='BracketRight' || event.code==='BracketLeft') {
       warpIndex=T.MathUtils.clamp(warpIndex+(event.code==='BracketRight'?1:-1),0,warps.length-1)
       event.preventDefault(); updateLighting(true); emit(true)
@@ -156,23 +155,24 @@ export function createEnvironment(scene, camera, canvas) {
     // World +X east, +Y up, −Z north.
     direction.set(Math.sin(solar.azimuth)*Math.cos(solar.elevation),Math.sin(solar.elevation),-Math.cos(solar.azimuth)*Math.cos(solar.elevation))
     uniforms.daylight.value=daylight; uniforms.twilight.value=Math.exp(-((elevation/9)**2))
-    uniforms.storm.value=storm?1:0
+    const dust=latestLifeSupport?.electrical?.opacity??Number(storm)
+    uniforms.storm.value=dust
     // Solar radius at 1 AU ≈0.2666°; Mars' distance makes the diameter ~2/3 Earth's.
     // https://science.nasa.gov/solar-system/planets/mars/what-does-a-sunrise-sunset-look-like-on-mars/
     uniforms.sunRadius.value=.2666/DEG*AU/solar.distance
     sun.position.copy(camera.position).addScaledVector(direction,100)
     sun.target.position.copy(camera.position)
-    sun.intensity=(storm ? .09 : 2.8)*smooth(elevation,-.7,12)
+    sun.intensity=T.MathUtils.lerp(2.8,.12,dust)*smooth(elevation,-.7,12)
     sun.color.set(0xffe7c6).lerp(coolSun,1-smooth(elevation,0,12))
     // Keep the light/shadow topology fixed. Visibility changes rebuild every lit shader,
     // which stalls software WebGL when the detailed terrain enters dusk.
     // Real Mars night is ~starlight (.012). GAME ASSUMPTION: the overview/plan camera gets a faint
     // 'enhanced view' floor so the base stays readable; the astronaut's own eyes (FPS) stay realistic.
-    ambient.intensity=(isFPS ? .012 : .09)+daylight*(storm ? .20 : .85)
-    ambient.color.set(storm?0xb99969:0xf3c9a2); ambient.groundColor.set(0x4d352a)
-    haze.setRGB(.002,.003,.006).lerp(storm ? stormHaze : clearHaze,daylight)
-    scene.fog.color.copy(haze); scene.fog.density=storm ? .032 : .000065
-    stars.material.opacity=night*(storm ? .015 : .9)
+    ambient.intensity=(isFPS ? .012 : .09)+daylight*T.MathUtils.lerp(.85,.20,dust)
+    ambient.color.set(0xf3c9a2).lerp(stormHaze,dust*.55); ambient.groundColor.set(0x4d352a)
+    haze.copy(clearHaze).lerp(stormHaze,dust).lerp(nightHaze,1-daylight)
+    scene.fog.color.copy(haze); scene.fog.density=T.MathUtils.lerp(.000065,.026,dust*dust)
+    stars.material.opacity=night*T.MathUtils.lerp(.9,.015,dust)
     // Sidereal rotation (88642.663 s) from NASA GISS Mars24 technical notes.
     stars.rotation.set(JEZERO.latitude-Math.PI/2,0,0)
     stars.rotateY(-(unixSeconds-EPOCH)*2*Math.PI/88642.663)
@@ -180,7 +180,7 @@ export function createEnvironment(scene, camera, canvas) {
     const earthElevation=solar.elevation+.46
     const earthAzimuth=solar.azimuth+.34
     earth.position.set(Math.sin(earthAzimuth)*Math.cos(earthElevation),Math.sin(earthElevation),-Math.cos(earthAzimuth)*Math.cos(earthElevation)).multiplyScalar(35000)
-    earth.visible=night>.15 && !storm && earth.position.y>0
+    earth.visible=night>.15 && dust<.65 && earth.position.y>0
     const elapsed=unixSeconds-EPOCH
     const rotation=elapsed*2*Math.PI/88642.663
     for(const moon of moons) {
@@ -215,16 +215,12 @@ export function createEnvironment(scene, camera, canvas) {
     // KOL contract: lmst is decimal Mars hours [0,24), elevation is degrees; state is unmodified İhan state.
     window.dispatchEvent(new CustomEvent('colony:state',{detail:{state:latestState,storm,activeTask,
       lifeSupport:latestLifeSupport, // IHAN-SRC: ARES / drawer integration
-      rover:latestRover, // ROVER: same shape as render_game_to_text().rover.
       lmst:solar.lmst/3600,headlamp:lampOn,sunElevationDeg:solar.elevation*DEG}}))
   }
   updateLighting(); alignHUD()
   return {
-    // Same illustrative Earth direction as the night-sky marker; not an ephemeris.
-    get earthDirection() { return earth.position.clone().normalize() },
     get telemetry() { return {lmst:solar.lmst/3600,headlamp:lampOn,sunElevationDeg:solar.elevation*DEG,warp:warps[warpIndex],unixSeconds,storm,audio:audio.enabled} },
     setLifeSupport(value) { latestLifeSupport=value }, // IHAN-SRC
-    setRover(value) { latestRover=value }, // ROVER
     setFPS(value) { isFPS=value; audio.setActive(value); updateLighting(true) },
     step(running) { audio.step(running) },
     sync(state,task) {

@@ -24,7 +24,7 @@ export function createWorldScene() {
       sunDisk=new THREE.Mesh(new THREE.SphereGeometry(75000,24,16),new THREE.MeshBasicMaterial({color:new THREE.Color(8,6,3)}));sunDisk.position.set(1.2e7,1.5e7,-1e7);scene.add(sunDisk);
     },
     update(pair,alpha){const s=interpolateState(pair.previous,pair.current,alpha);
-      ctx.cameras.update(s,ctx.frameDelta);const onboard=ctx.cameras.effective===1;
+      terrain.update(s);ctx.cameras.update(s,ctx.frameDelta,terrain.surfaceY);const onboard=ctx.cameras.effective===1;
       earth.group.visible=!s.mars;mars.group.visible=s.mars;
       const sunDirection=new THREE.Vector3(.65,.55,.6).normalize();sun.position.copy(sunDirection.clone().multiplyScalar(500));
       earth.update(s,sunDirection);mars.update(s,sunDirection);sky.update(s,ctx.cameras.camera);
@@ -33,7 +33,7 @@ export function createWorldScene() {
         for(const [body,id]of [[earth,'earth'],[mars,'mars']]){body.group.visible=true;body.group.scale.setScalar(1e-5);body.group.position.set((s.heliocentric[id][0]-s.heliocentric.ship[0])*1e-5,0,(s.heliocentric[id][1]-s.heliocentric.ship[1])*1e-5);}
         sunDirection.set(-s.heliocentric.ship[0],0,-s.heliocentric.ship[1]).normalize();sun.position.copy(sunDirection.clone().multiplyScalar(500));sunDisk.position.copy(sunDirection.clone().multiplyScalar(2e7));
       }else{earth.group.scale.setScalar(1);mars.group.scale.setScalar(1);}
-      pad.update(s);terrain.update(s);vehicle.update(s,onboard,ctx.cameras.camera);cabin.update(s,onboard);effects.setQuality(ctx.quality==='Düşük'?.45:ctx.quality==='Orta'?.7:1);effects.update(s,ctx.height);
+      pad.update(s);vehicle.update(s,onboard,ctx.cameras.camera);cabin.update(s,onboard);effects.setQuality(ctx.quality==='Düşük'?.45:ctx.quality==='Orta'?.7:1);effects.update(s,ctx.height);
       const shield=s.heatShield;
       heatShield.visible=Boolean(shield&&!shield.impacted&&!onboard);
       if(heatShield.visible){
@@ -58,7 +58,7 @@ export function createWorldScene() {
         const wx=x*c-y*sn,wy=x*sn+y*c-EARTH.radius,dx=wx-s.position[0],dy=wy-s.position[1],ct=Math.cos(s.theta),st=Math.sin(s.theta);
         model.position.set(dx*ct-dy*st,dx*st+dy*ct,0);model.rotation.z=b.angle+a+s.theta;
         model.visible=b.age<65&&!onboard;
-        model.userData.flash.visible=b.age<.7;
+        model.userData.flash.visible=b.id.startsWith('srb')&&b.age<.55;
       }
       for(const [id,model]of detached)if(!s.debris.some(b=>b.id===id)){scene.remove(model);disposeScene(model);detached.delete(id);}
       this.audioDistance=ctx.cameras.camera.position.length();this.state=s;

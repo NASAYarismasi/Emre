@@ -1,3 +1,6 @@
+import {DRILL_KW,WATER_KWH_PER_L} from "../ihan/power/mars-power.mjs";
+import {MOXIE_TANK_KG,MOXIE_TANK_PER_BANK_KG,moxieTankFull} from "../ihan/power/live-grid.mjs";
+import {createConsoleTargeter} from './console-target.mjs';
 // Facility computers: a console with a live screen beside İhan's air plant, water plant and greenhouse.
 // Walk up and press E (or use the "Yaşam destek tesisleri" drawer) to open its control panel; switches
 // feed İhan's stepAir/stepWater through src/sim/colonyLifeSupport.js. Running units also show effects:
@@ -6,55 +9,45 @@ import * as T from 'three'
 import { roverReadouts } from './rover.mjs' // ROVER
 
 const n = (v, d = 2) => Number.isFinite(v) ? v.toLocaleString('tr-TR', { maximumFractionDigits: d, minimumFractionDigits: d }) : '—'
-const STATE = { on: ['ÇALIŞIYOR', '#7ce0c3'], idle: ['BEKLEMEDE', '#e7b25c'], off: ['KAPALI', '#e06c5a'] }
+const STATE = { full: ["TANKLAR DOLU · BEKLEMEDE", "#e7b25c"], operational: ['SERA AKTİF', '#7ce0c3'], on: ['ÇALIŞIYOR', '#7ce0c3'], idle: ['BEKLEMEDE', '#e7b25c'], off: ['KAPALI', '#e06c5a'] }
 const STATE_COLORS = Object.fromEntries(Object.entries(STATE).map(([key, value]) => [key, new T.Color(value[1])])) // ROVER: reuse lamp colours, no frame allocations.
 
 export const SYSTEMS = {
-  power: {
-    title: 'Güç dağıtımı · İnverter hatları ve batarya', prompt: 'E · Güç dağıtımı bilgisayarı',
-    status: t => t.controls.power.main ? 'on' : 'off',
-    readouts: t => {
-      const p = t.power, f = p.forecast;
-      return [['Güneş üretimi', `${n(p.solarKW)} kW · ${n(f.energy)} kWh/sol`],
-        ['Batarya', `${n(p.batteryKWh)} / 180 kWh · %${n(p.batteryPercent, 1)}`],
-        ['İnverter 1–2 / doğrudan', `${n(p.directKW ?? 0)} kW`],
-        ['İnverter 3–10 / depolama', `${n(p.storageKW ?? 0)} kW`],
-        ['Tesisler / kullanılan', `${n(t.powerKW)} kW`],
-        ['Tahmin / doğrudan + destek', `${n(f.direct)} + ${n(f.backup)} kWh`],
-        ['Tahmin / LED gündüz + gece', `${n(f.dayLed)} + ${n(f.lit)} saat`],
-        ['Tahmin / sondaj ve su', `${n(f.drilling)} saat · ${n(f.waterLiters)} L`],
-        ['Gerçek / çıkarılan su', `${n(t.water.extractedL)} L`]];
-    },
-    controls: [['power', 'main', 'Ana şalter · sera / sondaj'], ['power', 'batterySupport', 'Sera / sondaj için batarya desteği'],
-      ...Array.from({ length: 10 }, (_, i) => ['power', 'inv' + (i + 1), `İnverter ${i + 1} · ${i < 2 ? 'doğrudan' : 'habitat / batarya'} · 42 panel`])],
-    note: '420 panel → 10 inverter; 1–2 doğrudan sera/sondaj, 3–10 habitat/batarya. Batarya 180 kWh. Tahmin bir solun örnek profilidir; canlı batarya ayrı ilerler. Güç tahmini %10 buz ve süblimasyon kullanır; gerçek su tesisi İhan’ın %50 buz, 20 L/6 saat sistemler modelini korur. Fırtına geçirgenliği %20 oyun varsayımıdır.',
-  },
+ habitat:{title:'Yaşam alanı · Sistem tableti',prompt:'E · Yaşam alanı tableti',controls:[],status:t=>t.oxygenKg>0?'on':'off',readouts:t=>[['Mürettebat',String(t.crew)],['Oksijen',n(t.oxygenKg,3)+' kg'],['MOXIE’den gelen',n((t.electrical?.state?.oxygenTransferKgHour??0)*1000,1)+' g/sa'],['Su',n(t.waterL)+' L'],['Kullanılan güç',n(t.powerKW)+' kW']],note:'Mevcut koloni simülasyonundan salt okunur veriler.'},
+ solar:{title:'Güneş tarlası · Enerji tableti',prompt:'E · Güneş tarlası tableti',controls:[],status:t=>t.electrical?.live?.production>0?'on':'idle',readouts:t=>[['Güneş üretimi',n(t.electrical?.live?.production)+' kW'],['Batarya',n(t.electrical?.state?.battery)+' / 180 kWh'],['Gece rezervi',n(t.electrical?.live?.reserve)+' kWh'],['AC bara desteği',n(t.electrical?.live?.transferKW)+' kW']],note:'İlhan mikroşebeke modeli · 5 × 36 kWh batarya.'},
   // ROVER: registered by the scene host; shares the facility computer and E interaction.
   rover: {
     title: 'Perseverance · Rover bilgisayarı', prompt: 'E · Rover bilgisayarı', controls: [],
     status: t => t.rover.mode === 'parked' ? 'idle' : 'on',
     readouts: t => roverReadouts(t.rover),
-    note: 'NASA/JPL: en çok 0,042 m/sn; MMRTG ≈110 W; iki 43 Ah batarya; 43 tüp (5 tanık). Rover zamanı ×10 hızlandırılmış (oyun varsayımı); [ / ] koloni zaman çarpanı ayrıca uygulanır. Otonom kampanya 280 m keşif halkalarına açılır, bilim yapar ve düşük bataryada üsse döner. Rotalar, yükler, süreler ve bilim verileri eğitsel oyun varsayımlarıdır. SHERLOC adayı yaşam kanıtı sayılmaz.', // ROVER2
+    note: 'NASA/JPL: en çok 0,042 m/sn; MMRTG ≈110 W; iki 43 Ah batarya; 43 tüp (5 tanık). Rover zamanı ×50 hızlandırılmış (oyun varsayımı); [ / ] koloni zaman çarpanı ayrıca uygulanır. Otonom kampanya 280 m keşif halkalarına açılır, bilim yapar ve düşük bataryada üsse döner. Rotalar, yükler, süreler ve bilim verileri eğitsel oyun varsayımlarıdır. SHERLOC adayı yaşam kanıtı sayılmaz.', // ROVER2
   },
   air: {
-    title: 'Hava tesisi · O₂ üretimi ve CO₂ temizleme', prompt: 'E · Hava tesisi bilgisayarı',
-    status: t => !t.controls.air.fans ? 'off' : t.air.producer ? 'on' : 'idle',
-    readouts: t => [
-      ['O₂ üretimi', `${n(t.air.producer ? .108 : 0, 3)} kg/sa`],
-      ['O₂ tankı', `${n(t.air.oxygenKg)} / 15 kg`],
-      ['O₂ rezervi', `${n(t.oxygenHours, 1)} saat`],
-      ['Kabin CO₂ (kütle)', `${n(t.air.co2Kg, 3)} kg`],
-      ['Temizlenen CO₂', `${n(t.air.removedCO2Kg)} kg`],
-      ['Güç', `${n(t.air.powerUsedKW ?? 0)} kW`],
-    ],
+    title: 'MOXIE · Oksijen üretimi', prompt: 'E · MOXIE bilgisayarı',
+    status: t => moxieTankFull(t.electrical?.state?.oxygen??0) ? 'full' : t.electrical?.live?.moxie?.duty ? 'on' : 'idle',
+    readouts: t => {
+      const state=t.electrical?.state
+      const gas=t.electrical?.live?.gas
+      const perTank=(state?.oxygen??0)/3
+      return [
+        ['CO₂ giriş', n((gas?.intakeKgHour??0)*1000, 1)+' g/sa'],
+        ['Toplam CO₂ giriş', n(state?.co2Intake??0,3)+' kg'],
+        ['O₂ üretimi', n((gas?.oxygenKgHour??0)*1000, 1)+' g/sa'],
+        ['Habitata giden O₂', n((state?.oxygenTransferKgHour??0)*1000,1)+' g/sa'],
+        ['Tank A / B / C', Array(3).fill(n(perTank,3)).join(' / ')+' kg'],
+        ['Toplam O₂', n(state?.oxygen??0,3)+' / '+MOXIE_TANK_KG+' kg'],
+        ['Tank başına kapasite', MOXIE_TANK_PER_BANK_KG+' kg'],
+      ]
+    },
     controls: [['air', 'fans', 'Fanlar (dolaşım)'], ['air', 'scrubber', 'CO₂ temizleyici'], ['air', 'producer', 'O₂ üretimi · 9× MOXIE']],
-    note: 'İhan’ın varsayımı: 0,108 kg O₂/sa ve 2,7 kW, dokuz küçük MOXIE’nin zirve hızı (Perseverance MOXIE en fazla ~12 g/sa üretti). Fanlar kapanırsa dolaşım durur; temizleyici ve üretici de çalışmaz. Mürettebat 3 × 0,84 kg O₂/gün tüketir (NASA BVAD).',
+    note: 'Tanklardan çıkan oksijen, yaşam alanına bağlı regülatörlü hatla mürettebata gider. Bir MOXIE modülü için NASA referansı 6 g O₂/sa. Dokuz modül tam güçte 54 g/sa üretir. Üç tank grubu eşit dolar, grup başına kapasite 5 kg. Tankların kapasitesi ve eşit dağılım proje varsayımıdır.',
   },
   water: {
     title: 'Su tesisi · buzdan su ve geri kazanım', prompt: 'E · Su tesisi bilgisayarı',
-    status: t => t.water.extractor || t.water.recycler ? 'on' : t.controls.water.extract || t.controls.water.recycle ? 'idle' : 'off',
+    status: t => t.electrical?.live?.water?.tankHold ? 'idle' : t.water.extractor || t.water.recycler ? 'on' : t.controls.water.extract || t.controls.water.recycle ? 'idle' : 'off',
     readouts: t => [
-      ['Buzdan çıkarım', `${n(t.water.extractor ? 20 / 6 : 0)} L/sa`],
+      ['Buzdan çıkarım', `${n(t.water.extractor ? DRILL_KW / WATER_KWH_PER_L : 0)} L/sa`],
+      ['Sondaj', t.electrical?.live?.water?.tankHold ? 'Tank doldu · beklemede' : t.water.extractor ? 'Çalışıyor' : 'Beklemede'],
       ['Temiz su', `${n(t.water.cleanL, 1)} / 100 L`],
       ['Su rezervi', `${n(t.waterDays, 1)} gün`],
       ['Atık su', `${n(t.water.wasteL, 1)} L`],
@@ -63,23 +56,30 @@ export const SYSTEMS = {
       ['Güç', `${n(t.water.powerUsedKW ?? 0)} kW`],
     ],
     controls: [['water', 'extract', 'Buz matkabı / ısıtıcı'], ['water', 'recycle', 'Atık su geri dönüşümü']],
-    note: 'İhan’ın varsayımı: 2 kW ile 20 L / 6 saat; regolitte %50 buz, %80 yakalama. Geri kazanım %85, 0,3 kW, 5 L/sa. Mürettebat 3 × 3,52 L/gün kullanır (NASA BVAD).',
+    note: 'İhan’ın varsayımı: 2 kW ile yaklaşık 1,07 L/saat; regolitte %10 buz, %80 yakalama. Geri kazanım %85, 0,3 kW, 5 L/sa. Mürettebat 3 × 3,52 L/gün kullanır (NASA BVAD).',
   },
   greenhouse: {
     title: 'Sera · aydınlatma ve sulama', prompt: 'E · Sera bilgisayarı',
-    status: t => t.greenhouse.ledOn || t.greenhouse.pumpOn ? 'on' : 'idle',
+    status: () => 'operational',
     readouts: t => [
-      ['LED büyüme ışığı', t.greenhouse.ledOn ? 'Yanıyor' : 'Sönük'],
+      ['Sera toplam net O₂', n((t.electrical?.live?.plantGas?.netKgHour??0)*1000,2)+' g/sa'],
+      ['Buğday net O₂', n((t.electrical?.live?.plantGas?.wheatKgHour??0)*1000,2)+' g/sa'],
+      ['Altı alg tüpü net O₂', n((t.electrical?.live?.plantGas?.algaeKgHour??0)*1000,2)+' g/sa'],
+      ['Birikimli net O₂', n((t.electrical?.state?.greenhouseNetKg??0)*1000,2)+' g'],
+      ['Yetiştirme ışığı', n(t.electrical?.live?.plantGas?.ppfd??0,0)+' µmol/m²/s'],
+      ['Mor yetiştirme ışıkları', t.greenhouse.ledOn ? 'Yanıyor' : 'Sönük'],
       ['LED modu', { auto: 'Otomatik', on: 'Sürekli açık', off: 'Kapalı' }[t.controls.greenhouse.led]],
       ['Sulama pompası', t.greenhouse.pumpOn ? 'Çalışıyor' : 'Durdu'],
-      ['Sera gücü', `${n(t.greenhouse.powerKW)} kW`],
+      ['LED gücü', n(t.electrical?.live?.greenhouse?.consumption??0)+' kW'],
       ['Hava kilidi', { idle: 'Kapalı · basınçlı', cycling: 'Basınç eşitleniyor', 'awaiting-door': 'Kapı bekleniyor' }[t.airlock] ?? '—'],
     ],
     controls: [['greenhouse', 'irrigation', 'Sulama pompası']],
     modes: ['greenhouse', 'led', [['auto', 'Otomatik'], ['on', 'Açık'], ['off', 'Kapalı']]],
-    note: 'Otomatik modda LED’ler Güneş 10°’nin altına inince yanar. İhan’ın altı 1,28 × 2,37 m yatağı, PPFD 350 ve alg ışığı hesabıyla LED gücü 3,36528 kW. Bitkilerin O₂ katkısı doğrulanmadığı için hesaba katılmaz (İhan, sistemler/README).',
+    note: 'Mor ışıklar elle açılıp kapatılabilir; otomatik modda yalnızca gece yanar. Sulama isteğe bağlı açılır. O₂ tahmini 18,2 m² buğday alanı ve altı alg tüpünü kapsar. Alg ışığı, etkin foton verimi ve solunum yükü proje varsayımıdır. Eksi değer net O₂ tüketimini gösterir. Habitatla gaz aktarımı modellenmez.',
   },
 }
+
+for(const id of ['air','water']){SYSTEMS[id].controls=[];delete SYSTEMS[id].modes;SYSTEMS[id].note+=' Bu sürümde ekran salt okunur; mevcut koloni kuralları korunur.';}
 
 function makeScreen() {
   const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 320
@@ -95,7 +95,7 @@ function drawScreen(screen, id, t) {
   g.fillText(sys.title.split(' · ')[0].toUpperCase(), 22, 54)
   g.font = '700 26px "Barlow", "Segoe UI", sans-serif'; g.fillStyle = color; g.fillText('● ' + label, 22, 92)
   g.font = '500 23px "Barlow", "Segoe UI", sans-serif'
-  sys.readouts(t).slice(0, 5).forEach(([k, v], i) => {
+  sys.readouts(t).filter(([key])=>id!=='air'||key!=='Toplam CO₂ giriş').slice(0, 5).forEach(([k, v], i) => {
     g.fillStyle = '#8fb3a8'; g.fillText(k, 22, 136 + i * 36)
     g.fillStyle = '#f2ebe0'; g.textAlign = 'right'; g.fillText(v, 490, 136 + i * 36); g.textAlign = 'left'
   })
@@ -116,7 +116,7 @@ function makeConsole(screen) {
   group.add(pedestal, head)
   group.traverse(o => { if (o.isMesh) o.castShadow = o.receiveShadow = true })
   display.castShadow = false
-  return { group, lamp }
+  return { group, lamp, display }
 }
 
 // Soft round particle sprite (radial falloff) so puffs read as gas/dust, not square pixels.
@@ -167,10 +167,10 @@ export function createSystemConsoles({ scene, heightAt, placements, emitters, ge
   let rover = null // ROVER
   const readTelemetry = () => { const t = getTelemetry(); if (rover) t.rover = rover.telemetry; return t } // ROVER
   function addConsole(id, at) { // ROVER: also used for the rover parking computer.
-    const screen = makeScreen(), { group, lamp } = makeConsole(screen)
+    const screen = makeScreen(), { group, lamp, display } = makeConsole(screen)
     group.position.set(at.x, heightAt(at.x, at.z), at.z); group.rotation.y = at.yaw ?? 0
     scene.add(group)
-    consoles[id] = { id, at, group, lamp, screen }
+    consoles[id] = { id, at, group, lamp, screen, display }
   }
   for (const [id, at] of Object.entries(placements)) addConsole(id, at) // ROVER
   const rand = () => Math.random() - .5
@@ -243,34 +243,29 @@ export function createSystemConsoles({ scene, heightAt, placements, emitters, ge
     if (document.pointerLockElement) document.exitPointerLock()
     panel.querySelector('h2').textContent = SYSTEMS[id].title
     panel.querySelector('.sc-note').textContent = SYSTEMS[id].note
+    const results=panel.querySelector('.sc-results'),controls=panel.querySelector('.sc-controls');if(id==='rover'){panel.insertBefore(controls,panel.querySelector('.sc-status'));panel.insertBefore(results,panel.querySelector('.sc-status'));}else{panel.insertBefore(results,panel.querySelector('.sc-note'));panel.insertBefore(controls,results);}
     renderControls(); renderReadouts()
-    panel.hidden = false; panel.focus({ preventScroll: true })
+    panel.hidden=false;window.dispatchEvent(new CustomEvent('colony:tablet-panel',{detail:{panel}}));panel.focus({preventScroll:true})
   }
-  function close() { open = null; panel.hidden = true; document.getElementById('scene')?.focus({ preventScroll: true }) }
-  on(panel.querySelector('.sc-close'), 'click', close)
+  function close(){open=null;panel.hidden=true;window.dispatchEvent(new CustomEvent('colony:tablet-panel-closed'));}
+  on(panel.querySelector('.sc-close'),'click',close);on(window,'colony:tablet-dismiss',()=>{open=null;panel.hidden=true;});on(window,'colony:open-rover',()=>show('rover'));on(window,'colony:open-system',e=>{if(SYSTEMS[e.detail?.id])show(e.detail.id);});
   on(document, 'keydown', e => { if (open && e.code === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close() } }, { capture: true })
   for (const b of document.querySelectorAll('[data-console]')) on(b, 'click', () => show(b.dataset.console))
 
-  const forward = new T.Vector3()
-  function nearest(camera) {
-    camera.getWorldDirection(forward)
-    for (const c of Object.values(consoles)) {
-      const dx = c.group.position.x - camera.position.x, dz = c.group.position.z - camera.position.z, d = Math.hypot(dx, dz)
-      if (d < 2.6 && (dx * forward.x + dz * forward.z) / (d || 1) > .55) return c
-    }
-    return null
-  }
+  const targetConsole=createConsoleTargeter();
+  const nearest=camera=>targetConsole(Object.values(consoles),camera);
+
   return {
-    registerRover(adapter) { rover = adapter; addConsole('rover', { x: 3.2, z: 17.6, yaw: .35 }) }, // ROVER
+    registerRover(adapter) { rover = adapter; addConsole('rover', { x: 3.6, z: 16.3, yaw: .35 }) }, // ROVER
     get open() { return open },
-    prompt: camera => nearest(camera) ? SYSTEMS[nearest(camera).id].prompt : '',
+    prompt: camera => {const c=nearest(camera);return c?SYSTEMS[c.id].prompt:''},
     interact(camera) { const c = nearest(camera); if (!c) return false; show(c.id); return true },
     show, close,
     blocks: (x, z, hx = .3, hz = .3) => Object.values(consoles).some(c => Math.abs(x - c.group.position.x) < .35 + hx && Math.abs(z - c.group.position.z) < .3 + hz),
     update(dt) {
       time += dt
       const t = readTelemetry() // ROVER
-      effects.air.update(dt, Boolean(t.air.producer || t.air.scrubber))
+      effects.air.update(dt, Boolean(t.electrical?.live?.moxie?.duty || t.air.scrubber))
       effects.water.update(dt, Boolean(t.water.extractor))
       effects.ice.update(dt, Boolean(t.water.extractor))
       effects.mist.update(dt, Boolean(t.greenhouse.pumpOn))
@@ -292,7 +287,7 @@ export function createSystemConsoles({ scene, heightAt, placements, emitters, ge
     },
     dispose() {
       abort.abort(); panel.remove()
-      for (const e of Object.values(effects)) e.dispose()
+      for (const e of Object.values(effects)) e.dispose();softDisc?.dispose();softDisc=null
       for (const c of Object.values(consoles)) { c.group.removeFromParent(); c.group.traverse(o => { o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose() }) }
     },
   }

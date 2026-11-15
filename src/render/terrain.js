@@ -74,7 +74,11 @@ export function createTerrain() {
   const diskGeo=new THREE.PlaneGeometry(14,14);diskGeo.rotateX(-Math.PI/2);
   for(let i=0;i<4;i++){const a=i*Math.PI/2,m=new THREE.Mesh(diskGeo,scourMat);m.position.set(Math.cos(a)*4.2,.035,Math.sin(a)*4.2);scour.add(m);}
   let anchor=null;
-  return {group,update(s){
+  return {group, surfaceY(x,z){
+    const angle=group.rotation.z, cos=Math.cos(angle), sin=Math.sin(angle);
+    const localX=(x-group.position.x)/cos;
+    return group.position.y+sin*localX+heightAt(localX,z)/cos;
+  },update(s){
     const altitude=s.altitude??1e6;
     group.visible=s.mars&&altitude<60000;
     if(!s.mars||!['EDL','LANDED'].includes(s.phase))anchor=null;
