@@ -1,3 +1,8 @@
+import {advanceRadiation,radiationAt} from '../../sim/marsRadiation.js'
+import {analyzeFrame} from '../frame-analysis.js'
+import {readMenuPreferences} from '../../menu/preferences.js'
+import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js'
+import { MARS_SOL_SECONDS, SURFACE_SOL_REAL_SECONDS } from '../../sim/marsSun.js'
 import {COMMS_PAD} from '../../data/colonyLayout.js';
 import {createRover} from './rover.mjs';
 import {createCommsStation} from '../ihan/comms-station.mjs';
@@ -41,7 +46,7 @@ let state = startColony()
 let workshop = startWorkshop()
 let selected
 let fpsEntered = false // first FPS entry starts at the lander; later entries resume in place
-let playerId = state.crew[0].id
+let playerId = state.crew.find(person=>person.id===readMenuPreferences().selected&&person.health>0)?.id ?? state.crew[0].id
 let sceneView
 let lastReport = colonyReport(state)
 const labels = { habitat: "Yaşam alanı", water: "Su", oxygen: "Oksijen", food: "Yiyecek", cleanAir: "CO₂ giderimi" }
@@ -54,11 +59,12 @@ function makeScene() {
     const {key,value}=event.detail??{};
     if(['closed','drill','lamp','blackStart'].includes(key)&&typeof value==='boolean')lifeSupport.power.controls[key]=value;
     if(key==='season'&&[0,90,180,270].includes(value))lifeSupport.power.controls.season=value;
+    if(key==='sweep')window.dispatchEvent(new CustomEvent('colony:sweep-status',{detail:lifeSupport.power.startSweep()}));
     if(key==='forecast')window.dispatchEvent(new CustomEvent('colony:power-report',{detail:lifeSupport.forecast()}));
   },{signal:lifecycle.signal})
   window.addEventListener('colony:analyze-soil',()=>ova.analyzeSoil(),{signal:lifecycle.signal})
   const listenerOptions = { signal: lifecycle.signal }
-  let disposed = false
+  let disposed = false, settingsOpen = document.getElementById("surface-settings").open
   // high-performance: on dual-GPU laptops (e.g. AMD iGPU + RTX 3050) this asks the browser for the discrete GPU.
   const renderer = new T.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' })
   renderer.setPixelRatio(Math.min(devicePixelRatio, 1.35))
@@ -74,6 +80,7 @@ function makeScene() {
   controls.minDistance = 2
   controls.maxDistance = 380
   const environment = createEnvironment(scene, camera, canvas)
+  environment.setPaused(settingsOpen)
   const ova = createOvaWorld(scene)
   const comms=createCommsStation(scene,(x,z)=>ova.ground.userData.heightAt(x,z));
   // Host perf: İhan's domes/tunnels (~330 parts) and the 108 horizon mounds never move -> per-material batches.
@@ -337,7 +344,6 @@ function makeScene() {
   const fps = createFirstPerson(canvas, camera, {
     onMode(active) {
       roofAccess = undefined
-      navigation.reset()
       controls.enabled = !active
       if (active) {
         currentView = 'astronaut'
@@ -348,21 +354,15 @@ function makeScene() {
       viewport.classList.toggle("fps", active)
       byId("view-mode").textContent = active ? "Üs planına dön" : "Astronotun gözünden gez"
       byId("view-help").textContent = active
-        ? "WASD Yürü · Shift Hızlan · Boşluk Zıpla · E Etkileşim · R Çatı · L Lamba · Esc Fareyi bırak"
+        ? "WASD Yürü · Shift Hızlan · Boşluk Zıpla · E Etkileşim · R Çatı · L Lamba · V Serbest bakış · Alt Tablet · Esc Ayarlar"
         : "Modülü seç ve zeminde veya çatıda istediğin noktaya tıkla · Sürükleyerek döndür"
       lastPointer = undefined
       redrawScene()
     },
     onAim: () => drawTarget(targetAt()),
     interact: () => {
-      // IHAN-SRC: E -> chamber -> pressure cycle -> E -> second door.
-      if (lifeSupport.interact(camera, fps)) return
-      const transition = navigation.interact(camera.position.x,camera.position.z,camera)
-      if (transition) {
-        fps.teleport(new T.Vector3(transition.x,transition.y+1.65,transition.z),0,transition.yaw)
-        status.textContent=transition.message
-        return
-      }
+      if (lifeSupport.interact(camera)) return
+      if (navigation.interact(camera.position.x,camera.position.z,camera)) return
       if (!navigation.inside) commit(targetAt())
     },
     accessRoof(lookFrom) {
@@ -384,7 +384,7 @@ function makeScene() {
       status.textContent = "Nişanı çatıda istediğin noktaya getir. E ile yerleştir, R ile in."
     },
     collides,
-    groundY: (x, z) => lifeSupport.inside ? lifeSupport.floorY : navigation.inside ? ova.floorY : roofAccess ? roofAccess.top : groundY(x, z),
+    groundY: (x, z) => roofAccess?.top ?? lifeSupport.floorAt(x,z) ?? navigation.floorAt(x,z) ?? groundY(x,z),
     onStep(x, z, yaw, running) {
       if (!roofAccess && !navigation.inside) tracks.step(x, z, yaw)
       environment.step(running)
@@ -429,8 +429,14 @@ function makeScene() {
     if (gl.clientWaitSync(gpuFence, 0, 0) === gl.TIMEOUT_EXPIRED) return false
     frameStats.gpuMs = performance.now() - submittedAt
     gl.deleteSync(gpuFence); gpuFence = null
+    canvas.dataset.ready = 'true'
     return true
   }
+  const frameSample = document.createElement('canvas')
+  frameSample.width = 256
+  const frameContext = frameSample.getContext('2d', {willReadFrequently:true})
+  let captureFrame = false
+  window.addEventListener('colony:capture-frame',()=>{captureFrame=true},listenerOptions)
   function renderFrame() {
     // Software WebGL can submit frames much faster than it can rasterize them.
     // One frame in flight keeps screenshots/input responsive instead of queuing
@@ -438,6 +444,17 @@ function makeScene() {
     if (!gpuReady()) return
     const start = performance.now()
     renderer.render(scene, camera)
+    if(captureFrame){
+      captureFrame=false
+      try{
+        frameSample.height=Math.max(1,Math.round(frameSample.width*canvas.height/canvas.width))
+        frameContext.drawImage(canvas,0,0,frameSample.width,frameSample.height)
+        const metrics=analyzeFrame(frameContext.getImageData(0,0,frameSample.width,frameSample.height))
+        window.dispatchEvent(new CustomEvent('colony:frame-analysis',{detail:{metrics,preview:frameSample.toDataURL('image/png')}}))
+      }catch{
+        window.dispatchEvent(new CustomEvent('colony:frame-analysis'))
+      }
+    }
     frameStats.cpuMs = performance.now() - start
     frameStats.calls = renderer.info.render.calls
     frameStats.triangles = renderer.info.render.triangles
@@ -445,16 +462,34 @@ function makeScene() {
     gpuFence = gl.fenceSync(gl.SYNC_GPU_COMMANDS_COMPLETE, 0)
     submittedAt = performance.now(); gl.flush()
   }
+  const crewDose = new Map()
+  let lastRadiationClock = environment.telemetry.unixSeconds
+  function updateRadiation(){
+    const clock=environment.telemetry.unixSeconds
+    const seconds=Math.max(0,clock-lastRadiationClock)
+    lastRadiationClock=clock
+    for(const person of state.crew){
+      if(person.health<=0)continue
+      const sheltered=person.id===playerId&&navigation.inside
+      crewDose.set(person.id,advanceRadiation(crewDose.get(person.id),seconds,sheltered))
+    }
+  }
+  const lifeTelemetry=()=>({...lifeSupport.telemetry,lab:ova.soilAnalysis,radiation:{
+    crewId:playerId,...radiationAt(navigation.inside),...advanceRadiation(crewDose.get(playerId),0,navigation.inside),
+  }})
   function tick(delta, updateAim = true) {
     environment.update(delta)
+    updateRadiation()
     ova.updateLab(delta)
     comms.update(delta);
     const roverX=reference.position.x,roverY=reference.position.y,roverZ=reference.position.z;
+    lifeSupport.power.beginRoverFrame();
     roverAgent.update(delta,environment.telemetry.warp,camera);
+    lifeSupport.power.finishRoverFrame(delta*environment.telemetry.warp*MARS_SOL_SECONDS/(SURFACE_SOL_REAL_SECONDS*3600));
     if(currentView==='rover'){camera.position.x+=reference.position.x-roverX;camera.position.y+=reference.position.y-roverY;camera.position.z+=reference.position.z-roverZ;controls.target.x+=reference.position.x-roverX;controls.target.y+=reference.position.y-roverY;controls.target.z+=reference.position.z-roverZ;}
     // IHAN-SRC: drive vendor calculations from the same Mars clock, including warp.
-    lifeSupport.update(delta, environment.telemetry, camera, fps)
-    const habitatTransition=navigation.update(delta); if(habitatTransition)fps.teleport(new T.Vector3(habitatTransition.x,habitatTransition.y+1.65,habitatTransition.z),0,habitatTransition.yaw)
+    lifeSupport.update(delta, environment.telemetry, camera, fps.active)
+    if(fps.active) navigation.update(delta,camera.position.x,camera.position.z)
     const power=lifeSupport.power.telemetry;
     ova.solar.framePower(power.strokes);
     ova.solar.setClosed(power.controls.closed);
@@ -462,7 +497,8 @@ function makeScene() {
       ova.lastPowerSecond=Math.floor(environment.telemetry.unixSeconds);
       ova.solar.updatePowerDisplay(power.live?.groups??[],power.live?.daylight);
     }
-    environment.setLifeSupport({...lifeSupport.telemetry,lab:ova.soilAnalysis})
+    environment.setLifeSupport(lifeTelemetry())
+    environment.publish()
     if(Math.floor(environment.telemetry.unixSeconds)!==ova.lastScreenSecond){ova.lastScreenSecond=Math.floor(environment.telemetry.unixSeconds);ova.updateLifeDisplays(lifeSupport.telemetry)}
     tracks.update(delta)
     const {sunElevationDeg,warp}=environment.telemetry
@@ -471,21 +507,38 @@ function makeScene() {
     crewAgents.update(delta, { state, playerId, fpsActive: fps.active, camera, night, speed: warp })
     if (fps.active) fps.update(delta, updateAim)
     else controls.update()
+    environment.updateLightingPose()
     scene.updateMatrixWorld()
   }
+  window.addEventListener('colony:surface-settings',event=>{
+    const action=event.detail;
+    if(action==='pause'||action==='resume'){
+      settingsOpen=action==='pause';
+      fps.clearKeys();
+      environment.setPaused(settingsOpen);
+    }else if(action==='audio')environment.toggleAudio();
+    else if(action==='lamp')environment.toggleLamp();
+    else if(action==='day'||action==='night'){
+      environment.setPeriod(action);
+      tick(0,false);
+    }
+    environment.publish(true);
+    if(manualTime)renderFrame();
+  },listenerOptions)
   renderer.setAnimationLoop(time => {
     const delta = Math.min(.05, (time - (previousTime ?? time)) / 1000)
     previousTime = time
-    if (!manualTime) { tick(delta); renderFrame() }
+    if (!manualTime) { if(!settingsOpen)tick(delta); renderFrame() }
+    else if(captureFrame)renderFrame()
   })
   // Preserve the same deterministic observation/stepping hooks as the flight scene.
   const previousTextHook = window.render_game_to_text, previousAdvanceHook = window.advanceTime
   window.render_game_to_text = () => JSON.stringify({
-    scene: "colony", coordinates: "metres; +X east, +Y up, -Z north", state,
+    scene: "colony", paused:settingsOpen, coordinates: "metres; +X east, +Y up, -Z north", state,
     storm: Boolean(state.timeline.at(-1)?.storm), activeTask: status.textContent,
     world:'duz-ova', view:currentView, insideHabitat:navigation.inside, habitatLights:ova.habitatLightsOn, assets:{crew:Boolean(teamCharacter),rover:reference.children.length>0},
-    fps: fps.active, player: fps.telemetry, environment: environment.telemetry,
-    lifeSupport: lifeSupport.telemetry, // IHAN-SRC: deterministic observer contract
+    fps: fps.active, playerId, player: fps.telemetry, environment: environment.telemetry,
+    lifeSupport: lifeTelemetry(), // Deterministic observer contract
     crewAgents: crewAgents.telemetry,rover:roverAgent.telemetry,comms:comms.telemetry,
     placement: { selected: selected ?? null, preview: preview.visible, marker: marker.visible },
     rendering: { ...frameStats, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, pixelRatio: renderer.getPixelRatio() },
@@ -496,7 +549,7 @@ function makeScene() {
     let remaining = ms / 1000
     // Only the final view needs picking during deterministic fast-forward.
     // Movement/ground contact still use every fixed suit step.
-    while (remaining > 1e-9) { const dt = Math.min(1/60, remaining); tick(dt, false); remaining -= dt }
+    while (!settingsOpen && remaining > 1e-9) { const dt = Math.min(1/60, remaining); tick(dt, false); remaining -= dt }
     if (fps.active) fps.update(0)
     while (!gpuReady()) await new Promise(requestAnimationFrame)
     renderFrame()
@@ -509,7 +562,7 @@ function makeScene() {
     byId("helmet").textContent = "Astronot " + (playerIndex + 1) + " · Sağlık %" + state.crew[playerIndex].health
     // IHAN-SRC: sol completion uses the new colony power/weather row.
     lifeSupport.sync(state)
-    environment.setLifeSupport({...lifeSupport.telemetry,lab:ova.soilAnalysis})
+    environment.setLifeSupport(lifeTelemetry())
     environment.sync(state, status.textContent)
     objects.clear()
     for (const node of surfaceDeposits) depositMeshes.get(node.id).visible = workshop.collected[node.id] !== state.sol
@@ -613,7 +666,7 @@ function makeScene() {
           if (loadedCharacters.has(index)) continue
           retiredCharacters.push(...actor.children)
           actor.clear()
-          actor.add(teamCharacter.clone(true))
+          actor.add(cloneSkinned(teamCharacter))
         }
         byId("character-status").textContent = "Uçuş modelindeki NASA astronotu kullanılıyor."
       }],
@@ -629,7 +682,7 @@ function makeScene() {
 
   return {
     redraw: redrawScene,
-    resetEnvironment() { environment.reset(); lifeSupport.reset(state);roverAgent.reset() }, // IHAN-SRC
+    resetEnvironment() { navigation.reset(); environment.reset(); crewDose.clear(); lastRadiationClock=environment.telemetry.unixSeconds; lifeSupport.reset(state);roverAgent.reset() }, // IHAN-SRC
     loadNASA,
     dispose() {
       if (disposed) return
@@ -663,7 +716,7 @@ function makeScene() {
       const view = ova.views[name]
       if (!view) return
       if (fps.active) fps.setActive(false)
-      navigation.reset(); roofAccess=undefined; currentView=name
+      roofAccess=undefined; currentView=name
       camera.position.fromArray(view.position); controls.target.fromArray(view.target); controls.update()
       for (const button of document.querySelectorAll('[data-ova-view]')) button.setAttribute('aria-pressed',String(button.dataset.ovaView===name))
       status.textContent=name==='solar' ? 'Güneş tarlası · 42 masa · 420 panel' : name==='pad' ? 'Modül kurulum alanı · Zemine tıklayarak yerleştir.' : 'Düz Ova · İhan’ın Mars üssü'
@@ -677,6 +730,7 @@ function makeScene() {
     selectPlayer() {
       roofAccess = undefined
       navigation.reset()
+      lifeSupport.resetNavigation()
       fps.respawn(crewActor(playerId).position, arrivalYaw)
       redrawScene()
     },
@@ -1055,6 +1109,7 @@ try {
   sceneView = makeScene()
   const choices = byId("player")
   state.crew.forEach((person, index) => choices.add(new Option("Astronot " + (index + 1), person.id)))
+  choices.value = playerId
   choices.onchange = () => { playerId = choices.value; sceneView.selectPlayer() }
   byId("view-mode").onclick = () => sceneView.toggleView()
   const characterFile = byId("character-file")

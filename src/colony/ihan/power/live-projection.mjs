@@ -19,6 +19,7 @@ export function projectPower(snapshot, drill) {
     state.water=water.cleanL
     state.iceKg=water.iceKg
   }
+  const waterBeforeDrilling=water?(habitat,dt)=>advanceFacilityWater(water,dt,{habitat},snapshot.facility.crew).cleanL:undefined
   const rows=[]
   const day=solarDay(snapshot.season)
   for(let index=0;index<3;index++) {
@@ -40,17 +41,17 @@ export function projectPower(snapshot, drill) {
         applyFacilities(live,duration)
         if(weather)cleanSolarRows(weather,duration*3600,false,state,live)
         hour+=duration
-        led+=live.greenhouse.duty*duration
+        led+=(live.greenhouse.ledKW>0?1:0)*duration
         continue
       }
       if(weather)advanceSolarWeather(weather,dt*3600)
       const conditions=weather?solarWeatherReadings(weather):snapshot.weather[index]
       live=(snapshot.blackStart!==false?recovery.step(state,midpoint<day.daylight,dt*3600,()=>{}):null) ??
-        stepMicrogrid(state,midpoint,dt,{...snapshot,...conditions,panelDust:conditions.dust??snapshot.panelDust,drill})
+        stepMicrogrid(state,midpoint,dt,{...snapshot,...conditions,panelDust:conditions.dust??snapshot.panelDust,drill,waterBeforeDrilling})
       applyFacilities(live,dt)
       if(weather)cleanSolarRows(weather,dt*3600,midpoint<day.daylight,state,live)
       solar+=live.production*dt
-      led+=live.greenhouse.duty*dt
+      led+=(live.greenhouse.ledKW>0?1:0)*dt
       drillHours+=live.water.duty*dt
       hour+=dt
     }

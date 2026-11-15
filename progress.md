@@ -48,3 +48,33 @@ Original prompt: tamam hadi başlayalım. gözle görülür bişey oluşsun. gel
 - Next task: visuals only. Existing Orion GLB temporarily represents the Mars lander; planet/landing visuals remain scaled. Finite TMI/MOI trajectory integration, real ephemerides, 3D inclination, weather, heat-shield sizing, terrain and closed-loop life support remain out of scope. Patched-conic maneuver fuel/time and ideal engines are documented assumptions, not validated hardware.
 - Controls: B starts TMI in parking orbit or deorbit in Mars orbit; MOI starts at calculated arrival; T cycles allowed warp, P pauses. README JSON shape unchanged; 1 supply game unit = 1 whole-crew day for that resource.
 - Final verification: 8 Vitest files / 33 tests passed; npm run build passed (existing Three.js bundle-size advisory only); git diff --check passed. Latest full browser run passed with no errors. No commit or push performed. Dev server for this session is http://127.0.0.1:5175/.
+
+## KERK and live colony systems (2026-11-15)
+
+- Renamed the tablet to KERK and added live electricity overview and detailed consumption. The live grid now starts from the landing payload, uses the scene sun, and accounts for storage, devices, cabling, conversion, unused PV, maintenance and rover charging.
+- Initialized lighting before the first visible scene frame and deferred the first local dust front past the arrival window. Habitat and greenhouse airlocks use manual walk-through passages after the pressure interlock.
+- Full water and MOXIE reserves stop production. Greenhouse lighting follows sunset and sunrise, with irrigation running by default. Live resource stocks advance only through the microgrid during sol changes.
+
+- Verification: 178 Vitest tests across 37 files, production build and diff check passed. Playwright exercised the first frame, KERK energy panel and forecast, both ways through both airlocks, and automatic lighting through sunset and sunrise. Browser errors: none.
+
+## KERK light display and NASA source audit (2026-11-15)
+
+- Alt, Q and Tab open KERK on the surface. Esc opens a paused surface settings dialog with audio, headlamp, day/night and flight navigation. Transfer starts from the nominal mission at TMI cutoff.
+- Relabeled the three physical MOXIE bank displays. Rebuilt the walking and seated EVA suits from the original NASA-published mesh without cutting the joints. Rendered KERK’s gloves in Blender from the same original geometry.
+- Added NASA sources to KERK applications and docs/NASA-KAYNAKLARI.md. Verified the exact consumable values against NASA Ames Table 1 and used NASA GISS’s Octavia E. Butler landing coordinates for the surface sun.
+
+## Samet menu and handheld controls (2026-11-15)
+
+- Connected Samet's menu, Mars backdrop and portraits to launch, transfer, landing and colony. The root opens the main menu, and the selected astronaut controls the colony start.
+- Added Auto, Manual On and Manual Off greenhouse LED modes, clean water irrigation metering, and a shared automatic/manual solar sweep cycle with a single energy debit. Kept the tablet footer out of the content area and shortened the surface toggle to Esc.
+
+- Verification: 183 Vitest tests passed. Playwright exercised the production main menu, settings, portrait choice, transfer and colony links, manual/automatic LED controls, irrigation water balance and the full manual sweep. Browser errors: none.
+
+- Flight entry hides the legacy chapter card before asset loading when entered through a selected chapter. The launch countdown, transfer and Mars orbit start were checked with the SLS asset deliberately held in the browser.
+
+- Hid the landing CTA during normal touchdown and kept a retry only for a storage failure. Playwright flew the Mars landing and confirmed automatic colony navigation received the exact flight payload.
+
+## KERK field analysis (2026-11-15)
+
+- Slowed the shared manual/automatic solar sweep to about 3.7 seconds at normal speed. Animated airborne dust and added warmer diffuse lighting without changing the PV weather model.
+- Added radiation, on-demand game-frame analysis and local Ollama tabs. The dosimeter integrates Gale RAD reference rates on the Mars simulation clock with explicit game shielding. The field tablet sends summarized telemetry and optional image metrics to local Ollama.

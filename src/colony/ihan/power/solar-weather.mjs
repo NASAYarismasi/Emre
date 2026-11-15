@@ -4,21 +4,36 @@ import {payForSweep} from './live-grid.mjs';
 const solSeconds=SOL_HOURS*3600;
 const clamp=value=>Math.max(0,Math.min(1,value));
 const smooth=value=>{const t=clamp(value);return t*t*(3-2*t);};
-const cleanSeconds=90, rowDelay=18, rowCount=6;
+// GAME ASSUMPTION: about 3.7 real seconds per full cycle at normal game speed.
+const cleanSeconds=300, rowDelay=48, rowCount=6;
+export const SOLAR_SWEEP_SECONDS=cleanSeconds+(rowCount-1)*rowDelay;
 const mean=values=>values.reduce((sum,value)=>sum+value,0)/values.length;
 
-export function createSolarWeather(){
-  return {elapsed:0,opacity:0,rows:[.024,.028,.032,.036,.04,.044],sweepElapsed:null,solarCleaningCredit:0};
+export function createSolarWeather(firstStormDelay=75){
+  return {elapsed:0,firstStormDelay,opacity:0,rows:[.024,.028,.032,.036,.04,.044],sweepElapsed:null,solarCleaningCredit:0};
 }
 
 export function advanceSolarWeather(weather,seconds){
   weather.elapsed+=seconds;
   // GAME ASSUMPTION: local dust fronts with varying timing and strength per sol.
   const sol=Math.floor(weather.elapsed/solSeconds);
-  const age=weather.elapsed%solSeconds-(75+(sol*7937)%42000);
+  const age=weather.elapsed%solSeconds-(sol===0?weather.firstStormDelay??75:75+(sol*7937)%42000);
   weather.opacity=(.80+(sol%4)*.05)*smooth(age/150)*smooth((510-age)/180);
   weather.rows=weather.rows.map((dust,row)=>Math.min(.75,
     dust+seconds*(.0001/3600+weather.opacity*(.00026+row*.00004))));
+}
+
+export function startSolarSweep(weather,state,live,append){
+  if(weather.sweepElapsed!==null)return 'Silecekler zaten çalışıyor.'
+  if(!live||live.recovering)return 'Silecekler için şebeke hazır değil.'
+  // Recently stored daylight PV can fund a sweep while the night reserve is still charging.
+  const floor=live.daylight?Math.min(live.reserve,Math.max(0,state.battery-weather.solarCleaningCredit)):live.reserve
+  if(!payForSweep(state,floor))return 'Silecekler için kullanılabilir batarya enerjisi yetersiz.'
+  weather.solarCleaningCredit=0
+  weather.sweepElapsed=0
+  live.groups.forEach((group,index)=>{group.stored=state.banks[index];})
+  append?.('Panel temizliği başladı. Sıralar sırayla temizleniyor.')
+  return null
 }
 
 export function cleanSolarRows(weather,seconds,daylight,state,live,append){
@@ -28,14 +43,8 @@ export function cleanSolarRows(weather,seconds,daylight,state,live,append){
     ? Math.min(cost,weather.solarCleaningCredit+charging*seconds/3600)
     : 0;
   if(weather.sweepElapsed===null){
-    // During the day, the last 0.20 kWh budgeted from new solar charging can fund maintenance.
-    const cleaningFloor=Math.min(live.reserve,Math.max(0,state.battery-weather.solarCleaningCredit));
-    if(daylight&&weather.opacity<.26&&mean(weather.rows)>=.085&&payForSweep(state,cleaningFloor)){
-      weather.solarCleaningCredit=0;
-      weather.sweepElapsed=0;
-      live.groups.forEach((group,index)=>{group.stored=state.banks[index];});
-      append?.('Panel temizliği başladı. Sıralar sırayla temizleniyor.');
-    }
+    if(daylight&&weather.opacity<.26&&mean(weather.rows)>=.085)
+      startSolarSweep(weather,state,live,append)
     return;
   }
   const before=weather.sweepElapsed;
@@ -45,7 +54,7 @@ export function cleanSolarRows(weather,seconds,daylight,state,live,append){
     const cleaned=clamp((weather.sweepElapsed-start)/cleanSeconds)-clamp((before-start)/cleanSeconds);
     return Math.max(.015,dust*Math.exp(-cleaned*(1.45-row*.075)));
   });
-  if(weather.sweepElapsed>=cleanSeconds+(rowCount-1)*rowDelay){
+  if(weather.sweepElapsed>=SOLAR_SWEEP_SECONDS){
     weather.sweepElapsed=null;
     append?.('Panel temizliği tamamlandı.');
   }

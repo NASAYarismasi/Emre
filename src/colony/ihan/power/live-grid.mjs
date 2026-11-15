@@ -1,10 +1,9 @@
 import { updateWaterTankHold } from "./facility-water.mjs"
 import { stepGreenhouseGas } from "./greenhouse-gas.mjs"
 import { panelProduction } from "./panel-production.mjs"
-import {GRID, SOL_HOURS, solarDay, solarEnergy, feederLoss, LED_KW, DRILL_KW, TANK_L, WATER_KWH_PER_L, CABINET_HEATER_KW, HABITAT_FEEDER_M, nightReserveFor, LOAD_PF, PV_GROUP_KVA, BATTERY_GROUP_KVA, reactiveRatio, remainingActiveKW} from "./mars-power.mjs"
+import {GRID, SOL_HOURS, solarDay, feederLoss, LED_KW, IRRIGATION_KW, IRRIGATION_L_PER_H, DRILL_KW, ICE_FRACTION, CAPTURE, TANK_L, WATER_KWH_PER_L, CABINET_HEATER_KW, HABITAT_FEEDER_M, nightReserveFor, LOAD_PF, PV_GROUP_KVA, BATTERY_GROUP_KVA, reactiveRatio, remainingActiveKW} from "./mars-power.mjs"
 
 const BANK_CAPACITY=GRID.capacity/5
-const EMPTY=.001
 const TIE_LIMIT_KW=8
 export const MOXIE_BANKS=3
 export const MOXIE_MODULES_PER_BANK=3
@@ -28,8 +27,11 @@ export function stepMoxieGas(state,powered,dt) {
     intakeTotalKg:state.co2Intake,reactedKgHour:oxygen/dt*88/32}
 }
 
-export function createGridState() {
-  return {battery:8,banks:[0,0,8/3,8/3,8/3], temperature:10, heaterOn:false, branches:{}, water:0, waterTankHold:false, oxygen:0, oxygenProduced:0, oxygenToHabitat:0, oxygenTransferKgHour:0, co2Intake:0, greenhouseOxygenKg:0, greenhouseNetKg:0, dawn:8, dailyShortfall:0,nightDraw:{greenhouse:0,water:0,moxie:0},loadEnergy:{greenhouse:0,water:0,moxie:0,habitat:0}}
+export function createGridState(initialEnergy=8) {
+  const battery=Math.max(0,Math.min(GRID.capacity,initialEnergy))
+  const primary=Math.min(battery,3*BANK_CAPACITY)/3
+  const backup=(battery-3*primary)/2
+  return {battery,banks:[backup,backup,primary,primary,primary], temperature:10, heaterOn:false, branches:{}, water:0, waterTankHold:false, oxygen:0, oxygenProduced:0, oxygenTankHold:false, oxygenToHabitat:0, oxygenTransferKgHour:0, co2Intake:0, greenhouseOxygenKg:0, greenhouseNetKg:0, dawn:8, dailyShortfall:0,nightDraw:{greenhouse:0,water:0,moxie:0},loadEnergy:{greenhouse:0,water:0,moxie:0,habitat:0,heater:0,rover:0,cleaning:0},initialEnergy:battery,energy:{solar:0,curtailed:0,feederLoss:0,conversionLoss:0}}
 }
 
 export function stepMicrogrid(state, hour, dt, options) {
@@ -41,57 +43,67 @@ export function stepMicrogrid(state, hour, dt, options) {
   const east=geometry?.east??-Math.cos(day.declination)*Math.sin(hourAngle)
   const north=Math.cos(latitude)*Math.sin(day.declination)-
     Math.sin(latitude)*Math.cos(day.declination)*Math.cos(hourAngle)
-  const elevation=daylight?Math.sin(latitude)*Math.sin(day.declination)+
-    Math.cos(latitude)*Math.cos(day.declination)*Math.cos(hourAngle):0
-  const average=Math.sin(18.44*Math.PI/180)*Math.sin(day.declination)+
-    Math.cos(18.44*Math.PI/180)*Math.cos(day.declination)*Math.sin(day.sunset)/day.sunset
-  const idealProduction=solarEnergy(42,transmission,season)*Math.max(0,elevation)/(average*day.daylight)
+  const elevation=daylight?(geometry?.elevation??(Math.sin(latitude)*Math.sin(day.declination)+
+    Math.cos(latitude)*Math.cos(day.declination)*Math.cos(hourAngle))):0
+  // 42 tables × 20 m², 70% clear atmosphere, 25% PV efficiency and 80% array performance.
+  const idealProduction=42*20*(geometry?.irradiance??day.irradiance)*.70*.25*.8*transmission*elevation/1000
   const generation=panelProduction(idealProduction,elevation,east,rowDust)
-  const groups=state.banks.map((stored,index)=>({index,stored,...generation[index],charge:0,draw:0,output:0,kvar:0}))
+  const groups=state.banks.map((stored,index)=>({index,stored,...generation[index],charge:0,draw:0,output:0,kvar:0,batteryKvar:0}))
   const production=groups.reduce((sum,group)=>sum+group.pv,0)
   const reserveHours=geometry?(daylight?geometry.nightHours:geometry.nightHours+dt/2):daylight?day.night:Math.max(0,SOL_HOURS-hour+dt/2)
-  const reserveDetails=nightReserveFor(reserveHours)
+  const ledCapacity=options.ledMode==='off'?0:lamp*LED_KW
+  const nightGreenhouse=closed&&!faults.greenhouse?ledCapacity+(options.irrigation?IRRIGATION_KW:0):0
+  const reserveDetails=nightReserveFor(reserveHours,nightGreenhouse)
   const reserve=reserveDetails.total
-  const reserveAfterStep=nightReserveFor(Math.max(0,(geometry?.nightHours??(SOL_HOURS-hour))-dt/2)).total
+  const remainingNight=daylight?reserveHours:Math.max(0,reserveHours-dt)
+  const reserveAfterStep=nightReserveFor(remainingNight,nightGreenhouse).total
+  const essentialReserve=nightReserveFor(remainingNight).total
   const storage=[groups[4],groups[3],groups[2]]
   const direct=groups.slice(0,2)
-  const backupSelected=()=>storage.some(bank=>bank.stored<=EMPTY)
-  const nightBanks=()=>backupSelected()?[...storage,...direct]:storage
+  const dischargeOrder=[...storage,...direct]
   const headroom=(bank,ratio)=>remainingActiveKW(bank.output,bank.kvar,daylight?PV_GROUP_KVA:BATTERY_GROUP_KVA,ratio)
-  const bankPower=(bank,minimum,ratio=0)=>{
-    const stored=groups.reduce((sum,item)=>sum+item.stored,0)
-    return Math.min(
-      headroom(bank,ratio),
-      Math.max(0,GRID.dischargeKW/3-bank.draw*GRID.dischargeEfficiency),
-      bank.stored*GRID.dischargeEfficiency/dt,
-      Math.max(0,stored-minimum)*GRID.dischargeEfficiency/dt)
-  }
-  const draw=(demand,minimum=0,ratio=0,critical=false)=>{
-    let delivered=0
-    for(const group of [...storage,...direct]) {
-      if(delivered>=demand || (group.index<2&&!critical&&!backupSelected())) break
-      const busRemaining=Math.max(0,GRID.dischargeKW-groups.reduce((sum,bank)=>sum+bank.output,0))
-      const power=Math.min(demand-delivered,busRemaining,bankPower(group,minimum,ratio))
+  const storedTotal=()=>groups.reduce((sum,bank)=>sum+bank.stored,0)
+  const batteryOutput=()=>groups.reduce((sum,bank)=>sum+bank.draw*GRID.dischargeEfficiency,0)
+  const bankPower=(bank,ratio)=>Math.min(
+    headroom(bank,ratio),
+    remainingActiveKW(bank.draw*GRID.dischargeEfficiency,bank.batteryKvar,BATTERY_GROUP_KVA,ratio),
+    bank.stored*GRID.dischargeEfficiency/dt)
+  const batteryBudget=minimum=>Math.min(Math.max(0,GRID.dischargeKW-batteryOutput()),
+    Math.max(0,storedTotal()-minimum)*GRID.dischargeEfficiency/dt)
+  const draw=(demand,minimum=0,ratio=0)=>{
+    const limits=dischargeOrder.map(bank=>bankPower(bank,ratio))
+    const totalLimit=limits.reduce((sum,limit)=>sum+limit,0)
+    const delivered=Math.min(demand,batteryBudget(minimum),totalLimit)
+    if(delivered<=0)return 0
+    // Share load across the banks so spare energy is not stranded behind too few inverters at dawn.
+    dischargeOrder.forEach((bank,index)=>{
+      const power=delivered*limits[index]/totalLimit
       const drawKW=power/GRID.dischargeEfficiency
-      group.draw+=drawKW
-      group.output+=power
-      group.kvar+=power*ratio
-      group.stored=Math.max(0,group.stored-drawKW*dt)
-      delivered+=power
-    }
+      bank.draw+=drawKW
+      bank.output+=power
+      bank.kvar+=power*ratio
+      bank.batteryKvar+=power*ratio
+      bank.stored=Math.max(0,bank.stored-drawKW*dt)
+    })
     return delivered
   }
   const habitatGroup=groups[3]
-  const lampDemand=lamp*LED_KW
+  const lampDemand=!daylight||options.ledMode==='on'?ledCapacity:0
+  const pumpRequested=options.irrigation&&state.water>0?IRRIGATION_KW:0
+  const greenhouseDemand=lampDemand+pumpRequested
   const tankHold=updateWaterTankHold(state)
   const drillDemand=daylight&&drill&&!tankHold&&(state.iceKg??1)>0?DRILL_KW:0
-  const moxieDemand=daylight&&!moxieTankFull(state.oxygen)?MOXIE_KW:0
-  const habitatDemand=daylight?60/(SOL_HOURS/2):6
+  // GAME ASSUMPTION: restart at 99% so the habitat regulator can draw from a full reserve.
+  state.oxygenTankHold=moxieTankFull(state.oxygen)||(state.oxygenTankHold&&state.oxygen>MOXIE_TANK_KG*.99)
+  const fullTank=state.oxygenTankHold
+  const moxieDemand=daylight&&!fullTank?MOXIE_KW:0
+  const moxieFraction=Math.min(1,Math.max(0,MOXIE_TANK_KG-state.oxygen)/(MOXIE_KG_PER_HOUR*dt))
+  const habitatDemand=daylight?60/(geometry?.daylightHours??day.daylight):GRID.habitatKW
   const withLoss=(kw,length,pf)=>kw+feederLoss(kw,length,4,pf)
   const localNeeds=[
     closed&&!faults.water?withLoss(drillDemand,190,LOAD_PF.water):0,
-    closed&&!faults.greenhouse?withLoss(lampDemand,105,LOAD_PF.greenhouse):0,
-    !faults.moxie?withLoss(moxieDemand,90,LOAD_PF.moxie):0,
+    closed&&!faults.greenhouse?withLoss(greenhouseDemand,105,LOAD_PF.greenhouse):0,
+    !faults.moxie?withLoss(moxieDemand,90,LOAD_PF.moxie)*moxieFraction:0,
     withLoss(habitatDemand,HABITAT_FEEDER_M,LOAD_PF.habitat)+CABINET_HEATER_KW,
     0
   ]
@@ -128,26 +140,26 @@ export function stepMicrogrid(state, hour, dt, options) {
   }
   const fromHabitatGroup=(demand,ratio=0)=>{
     const fromPV=servePV(habitatGroup,demand,true,ratio)
-    const fromBattery=Math.min(demand-fromPV,bankPower(habitatGroup,0,ratio))
-    habitatGroup.output+=fromBattery
-    habitatGroup.kvar+=fromBattery*ratio
-    habitatGroup.draw+=fromBattery/GRID.dischargeEfficiency
-    habitatGroup.stored=Math.max(0,habitatGroup.stored-fromBattery*dt/GRID.dischargeEfficiency)
+    const fromBattery=draw(demand-fromPV,0,ratio)
     habitatGroup.localServed+=fromBattery
     return fromPV+fromBattery
   }
-  const branch=(key,load,length,fault,group,connected=closed)=>{
+  const branch=(key,load,length,fault,group,connected=closed,fraction=1)=>{
     const pf=LOAD_PF[key]
-    const q=load*reactiveRatio(pf)
-    const loss=feederLoss(load,length,4,pf)
-    const need=load+loss
+    const consumption=load*fraction
+    const q=consumption*reactiveRatio(pf)
+    const loss=feederLoss(load,length,4,pf)*fraction
+    const need=consumption+loss
     const ratio=need>0?q/need:0
-    const minimum=reserveAfterStep
+    const minimum=key==="greenhouse"&&!daylight?essentialReserve:reserveAfterStep
     const bankOutputBefore=groups.map(bank=>bank.output)
-    const available=daylight?availablePV(group,false,ratio):Math.min(
-      Math.max(0,GRID.dischargeKW-groups.reduce((sum,bank)=>sum+bank.output,0)),
-      Math.max(0,groups.reduce((sum,bank)=>sum+bank.stored,0)-minimum)*GRID.dischargeEfficiency/dt,
-      nightBanks().reduce((sum,bank)=>sum+bankPower(bank,minimum,ratio),0))
+    const bankDrawBefore=groups.reduce((sum,bank)=>sum+bank.draw,0)
+    const batteryAvailable=Math.min(batteryBudget(minimum),
+      dischargeOrder.reduce((sum,bank)=>sum+bankPower(bank,ratio),0))
+    const pvAvailable=daylight?availablePV(group,false,ratio):0
+    const allowBattery=!daylight||key==="greenhouse"
+    const useBattery=allowBattery&&pvAvailable<need*1.03&&batteryAvailable>pvAvailable
+    const available=useBattery?batteryAvailable:pvAvailable
     const branchState=state.branches[key] ??= {on:false,restart:0}
     branchState.restart=Math.max(0,branchState.restart-dt)
     const enabled=connected&&!fault&&need>0
@@ -157,38 +169,52 @@ export function stepMicrogrid(state, hour, dt, options) {
     if(branchState.on&&!on) branchState.restart=30/3600
     branchState.on=on
     if(on) {
-      if(daylight) servePV(group,need,false,ratio)
-      else draw(need,minimum,ratio)
+      if(useBattery)draw(need,minimum,ratio)
+      else servePV(group,need,false,ratio)
     }
     const sources=groups.filter(bank=>bank.output-bankOutputBefore[bank.index]>1e-8).map(bank=>bank.index+1)
-    const batteryPower=on&&!daylight?need/GRID.dischargeEfficiency:0
+    const batteryPower=groups.reduce((sum,bank)=>sum+bank.draw,0)-bankDrawBefore
     if(!daylight) state.nightDraw[key]+=batteryPower*dt
-    return {consumption:on?load:0,loss:on?loss:0,supply:on?need:0,duty:Number(on),
-      batteryPower,nightEnergy:state.nightDraw[key],demand:load,fault,sources,kvar:on?q:0,kva:on?load/pf:0,pf:on?pf:null,
-      current:on?load*1000/(Math.sqrt(3)*GRID.voltage*pf):0}
+    return {consumption:on?consumption:0,loss:on?loss:0,supply:on?need:0,duty:on?fraction:0,
+      batteryPower,nightEnergy:state.nightDraw[key],demand:load,fault,sources,kvar:on?q:0,kva:on?consumption/pf:0,pf:on?pf:null,
+      current:on?consumption*1000/(Math.sqrt(3)*GRID.voltage*pf):0}
   }
   const habitat=habitatDemand
   const habitatLoss=feederLoss(habitat,HABITAT_FEEDER_M,4,LOAD_PF.habitat)
   const habitatInput=habitat+habitatLoss
   const outputsBefore=groups.map(group=>group.output)
   const habitatRatio=habitat*reactiveRatio(LOAD_PF.habitat)/habitatInput
-  const delivered=daylight?fromHabitatGroup(habitatInput,habitatRatio):draw(habitatInput,0,habitatRatio,true)
+  const habitatDrawBefore=batteryOutput()
+  const delivered=daylight?fromHabitatGroup(habitatInput,habitatRatio):draw(habitatInput,0,habitatRatio)
   const life=delivered*habitat/habitatInput
   const habitatMeter={consumption:life,loss:delivered-life,supply:delivered,duty:life/habitat,
-    batteryPower:daylight?habitatGroup.draw:delivered/GRID.dischargeEfficiency,nightEnergy:0,demand:habitat,kvar:life*reactiveRatio(LOAD_PF.habitat),kva:life/LOAD_PF.habitat,pf:life>0?LOAD_PF.habitat:null,
+    batteryPower:(batteryOutput()-habitatDrawBefore)/GRID.dischargeEfficiency,nightEnergy:0,demand:habitat,kvar:life*reactiveRatio(LOAD_PF.habitat),kva:life/LOAD_PF.habitat,pf:life>0?LOAD_PF.habitat:null,
     current:life*1000/(Math.sqrt(3)*GRID.voltage*LOAD_PF.habitat),
     sources:groups.filter(group=>group.output-outputsBefore[group.index]>1e-8).map(group=>group.index+1)}
   const ambient=-60+38*Math.max(0,elevation)
   if(state.temperature<=7) state.heaterOn=true
   else if(state.temperature>=9) state.heaterOn=false
-  let heater=!daylight&&state.heaterOn?draw(CABINET_HEATER_KW,0,0,true):0
+  let heater=!daylight&&state.heaterOn?draw(CABINET_HEATER_KW,0,0):0
   if(daylight&&state.heaterOn) heater=fromHabitatGroup(CABINET_HEATER_KW)
-  const greenhouse=branch("greenhouse",lampDemand,105,faults.greenhouse,direct[1])
-  const moxie=branch("moxie",moxieDemand,90,faults.moxie,groups[2],true)
-  const plantGas=stepGreenhouseGas(state,{elevation,transmission,ledFraction:greenhouse.duty*lamp},dt)
+  const recoveredWater=options.waterBeforeDrilling?.(habitatMeter,dt)??state.water
+  const requestedLiters=options.irrigation?Math.min(recoveredWater,IRRIGATION_L_PER_H*dt):0
+  const pumpDemand=requestedLiters/(IRRIGATION_L_PER_H*dt)*IRRIGATION_KW
+  localNeeds[1]=closed&&!faults.greenhouse?withLoss(lampDemand+pumpDemand,105,LOAD_PF.greenhouse):0
+  const greenhouse=branch("greenhouse",lampDemand+pumpDemand,105,faults.greenhouse,direct[1])
+  greenhouse.ledKW=greenhouse.duty*lampDemand
+  greenhouse.pumpKW=greenhouse.duty*pumpDemand
+  greenhouse.irrigationL=greenhouse.duty*requestedLiters
+  greenhouse.irrigationLph=greenhouse.irrigationL/dt
+  const moxie=branch("moxie",moxieDemand,90,faults.moxie,groups[2],closed,moxieFraction)
+  const plantGas=stepGreenhouseGas(state,{elevation,transmission,ledFraction:greenhouse.ledKW/LED_KW},dt)
   const gas=stepMoxieGas(state,moxie.duty>0,dt)
-  const water=branch("water",drillDemand,190,faults.water,direct[0])
-  for(const [key,power] of Object.entries({habitat:life,greenhouse:greenhouse.consumption,moxie:moxie.consumption,water:water.consumption}))
+  gas.tankFull=moxieTankFull(state.oxygen)
+  if(gas.tankFull)state.oxygenTankHold=true
+  const waterBeforeDrilling=recoveredWater-greenhouse.irrigationL
+  const drillFraction=Math.min(1,Math.max(0,TANK_L-waterBeforeDrilling)*WATER_KWH_PER_L/(DRILL_KW*dt),
+    (state.iceKg??Infinity)*ICE_FRACTION*CAPTURE*WATER_KWH_PER_L/(DRILL_KW*dt))
+  const water=branch("water",drillDemand,190,faults.water,direct[0],closed,drillFraction)
+  for(const [key,power] of Object.entries({habitat:life,greenhouse:greenhouse.consumption,moxie:moxie.consumption,water:water.consumption,heater}))
     state.loadEnergy[key]+=power*dt
   state.dailyShortfall+=(habitat-life)*dt
   state.temperature+=(heater-.016*(state.temperature-ambient))*dt/.25
@@ -198,13 +224,33 @@ export function stepMicrogrid(state, hour, dt, options) {
     group.charge=input*GRID.chargeEfficiency
     group.stored+=group.charge*dt
   }
-  water.tankHold=tankHold
   water.lineEnergized=closed&&!faults.water&&(production>0||groups.some(group=>group.output>0))
-  Object.assign(groups[0],{waterTankHold:tankHold,waterLineEnergized:water.lineEnergized})
-  state.water=Math.min(TANK_L,state.water+water.consumption*dt/WATER_KWH_PER_L)
+  groups[0].waterLineEnergized=water.lineEnergized
+  state.water=Math.min(TANK_L,waterBeforeDrilling+water.consumption*dt/WATER_KWH_PER_L)
+  water.tankHold=updateWaterTankHold(state)
+  groups[0].waterTankHold=water.tankHold
   state.banks=groups.map(group=>group.stored)
   state.battery=state.banks.reduce((sum,stored)=>sum+stored,0)
-  return {groups,transfers,transferKW,backupActive:!daylight&&(backupSelected()||direct.some(group=>group.draw>0)),daylight,elevation,east,north,production,heater,reserve,reserveDetails,life,habitat:habitatMeter,moxie,gas,plantGas,greenhouse,water}
+  const live={groups,transfers,transferKW,backupActive:!daylight&&direct.some(group=>group.draw>0),daylight,elevation,east,north,production,heater,reserve,reserveDetails,life,habitat:habitatMeter,moxie,gas,plantGas,greenhouse,water}
+  const balance=gridPowerBalance(live)
+  for(const key of Object.keys(state.energy))state.energy[key]+=balance[key]*dt
+  return live
+}
+
+export function gridPowerBalance(live) {
+  const groups=live?.groups??[]
+  const solar=live?.production??0
+  const charging=groups.reduce((sum,group)=>sum+group.charge,0)
+  const discharging=groups.reduce((sum,group)=>sum+group.draw,0)
+  const toBus=groups.reduce((sum,group)=>sum+group.output,0)
+  const loads=['habitat','water','moxie','greenhouse'].map(key=>live?.[key])
+  const deviceKW=loads.reduce((sum,meter)=>sum+(meter?.consumption??0),live?.heater??0)
+  const feederLoss=loads.reduce((sum,meter)=>sum+(meter?.loss??0),0)
+  const batteryToBus=live?.recovering?toBus:discharging*GRID.dischargeEfficiency
+  const solarToBus=Math.max(0,toBus-batteryToBus)
+  const curtailed=Math.max(0,solar-solarToBus-charging/GRID.chargeEfficiency)
+  const conversionLoss=discharging-batteryToBus+charging*(1/GRID.chargeEfficiency-1)
+  return {solar,charging,discharging,toBus,deviceKW,feederLoss,batteryToBus,solarToBus,curtailed,conversionLoss}
 }
 
 export function payForSweep(state,reserve) {
@@ -212,5 +258,7 @@ export function payForSweep(state,reserve) {
   if(state.battery<reserve+cost || state.temperature<0) return false
   for(let i=0;i<5;i++) state.banks[i]-=cost*state.banks[i]/state.battery
   state.battery-=cost
+  state.loadEnergy.cleaning+=.20
+  state.energy.conversionLoss+=cost-.20
   return true
 }

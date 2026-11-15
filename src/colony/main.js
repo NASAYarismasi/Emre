@@ -1,3 +1,4 @@
+import { mountFieldTablet } from './field-tablet.js';
 import {mountPowerTablet} from './power-tablet.js';
 import '../ui/fullscreen.js';
 import { bindEclss } from './ihan/eclss.mjs';
@@ -9,16 +10,36 @@ import { colonyWristData } from '../ui/wristData.js';
 import { REALISM_NOTES, REALISM_SOURCES } from './realism.js';
 
 const landing = readLandingPayload(exampleLanding);
-// ARES integration: subscribe before the scene emits its first colony:state snapshot.
+// KERK integration: subscribe before the scene emits its first colony:state snapshot.
 // The initial projection is read-only; the scene remains the sole colony state owner.
 // Flight payload supplies are crew-sols; İhan's createColonyFromFlight converts them to person-sols.
 let wristDetail = { state: landing.source === 'flight' ? createColonyFromFlight(landing) : createColony(landing) };
+const settings = document.getElementById('surface-settings');
 const wrist = mountWristTerminal({ root: document.querySelector('main') ?? document.body,
-  getData: () => colonyWristData(wristDetail),onToggle:raised=>{document.body.classList.toggle('tablet-active',raised);if(raised)document.exitPointerLock?.();else{showDrawer(null);window.dispatchEvent(new CustomEvent('colony:tablet-dismiss'));}} });
+  surfaceShortcuts: true, canToggle: () => !settings.open,
+  getData: () => colonyWristData(wristDetail),
+  onToggle(raised) {
+    document.body.classList.toggle('tablet-active',raised);
+    if(raised) {
+      document.exitPointerLock?.();
+      document.querySelector('.ares-close').focus({preventScroll:true});
+    } else {
+      showDrawer(null);
+      window.dispatchEvent(new CustomEvent('colony:tablet-dismiss'));
+      canvas.focus({preventScroll:true});
+    }
+  }
+});
 let lastWristTask=null;
+const setSurfaceOption=(action,value,on,off)=>{
+  const button=settings.querySelector(`[data-surface="${action}"]`);
+  button.textContent=value?on:off;
+};
 function onColonyState(event) {
   if (!event.detail || typeof event.detail !== 'object') return;
   wristDetail = { ...wristDetail, ...event.detail, state: event.detail.state ?? wristDetail.state };
+  setSurfaceOption('audio',wristDetail.audio,'Sesi kapat','Sesi aç');
+  setSurfaceOption('lamp',wristDetail.headlamp,'Kafa lambasını kapat','Kafa lambasını aç');
   const task=event.detail.activeTask;if(typeof task==='string'&&task&&task!==lastWristTask){if(lastWristTask!==null)wrist.notify(task);lastWristTask=task;}
   // The terminal samples at 4 Hz while raised, even if the scene publishes every frame.
 }
@@ -64,7 +85,11 @@ function tabletPage(node){
   panelSlot.append(node);node.hidden=false;panelSlot.hidden=false;activeTabletPanel=node;
   document.querySelector('.ares-screen').classList.add('has-panel');content.hidden=true;tabletTabs.hidden=true;
   watchActions.hidden=true;managementToggle.textContent='UYGULAMALAR';
-  document.body.classList.add('tablet-active');document.exitPointerLock?.();wrist.setRaised(true);
+  document.body.classList.add('tablet-active');document.exitPointerLock?.();
+  if(!wrist.raised){
+    wrist.setRaised(true);
+    document.querySelector('.ares-close').focus({preventScroll:true});
+  }
 }
 function tabletHome(){if(activeTabletPanel)activeTabletPanel.hidden=true;activeTabletPanel=null;panelSlot.hidden=true;document.querySelector('.ares-screen').classList.remove('has-panel');tabletTabs.hidden=false;content.hidden=false;}
 function showDrawer(id) {
@@ -85,30 +110,66 @@ for (const toggle of toggles) listen(toggle, 'click', () => {
 });
 // Management remains accessible from the manually raised wrist, without a screen-edge sidebar.
 const watchActions=document.createElement('nav');watchActions.className='ares-colony-actions';watchActions.hidden=true;watchActions.setAttribute('aria-label','Koloni yönetimi');
-for(const [id,title,subtitle] of [['rover','Rover kontrol','Görev · üsse çağır · şarj'],['water','Su tesisi','Buz çıkarma · geri kazanım'],['air','Hava tesisi','O₂ üretimi · CO₂ giderimi'],['solar','Güneş & enerji','Güç bütçesi · tüketim'],['greenhouse','Sera','Büyüme ışığı · sulama'],['habitat','Yaşam alanı','Mürettebat · yaşam desteği']]){
+for(const [id,title,subtitle] of [['rover','Rover kontrol','Görev · üsse çağır · şarj'],['water','Su tesisi','Buz çıkarma · geri kazanım'],['air','Hava tesisi','O₂ üretimi · CO₂ giderimi'],['solar','Güneş & enerji','Güneş tarlası konsolu'],['greenhouse','Sera','Büyüme ışığı · sulama'],['habitat','Yaşam alanı','Mürettebat · yaşam desteği']]){
   const button=document.createElement('button');button.type='button';const label=document.createElement('b');label.textContent=title;const sub=document.createElement('small');sub.textContent=subtitle;button.append(label,sub);listen(button,'click',()=>window.dispatchEvent(new CustomEvent('colony:open-system',{detail:{id}})));watchActions.append(button);
 }
 const eclssApp=document.createElement('button');eclssApp.type='button';eclssApp.textContent='ECLSS · yaşam destek dengesi';listen(eclssApp,'click',()=>{window.dispatchEvent(new CustomEvent('colony:tablet-dismiss'));showDrawer('eclss-drawer');});watchActions.append(eclssApp);
 const powerTablet=mountPowerTablet(tabletPage);
-const powerApp=document.createElement('button');powerApp.type='button';powerApp.textContent='Güç şebekesi · İlhan';listen(powerApp,'click',()=>{window.dispatchEvent(new CustomEvent('colony:tablet-dismiss'));showDrawer(null);powerTablet.open();});watchActions.append(powerApp);
+const powerApp=document.createElement('button');powerApp.type='button';powerApp.textContent='Elektrik ve enerji tüketimi';listen(powerApp,'click',()=>{window.dispatchEvent(new CustomEvent('colony:tablet-dismiss'));showDrawer(null);powerTablet.open();});watchActions.append(powerApp);
 listen(window,'pagehide',()=>powerTablet.dispose());
 const labApp=document.createElement('button');labApp.type='button';labApp.textContent='Laboratuvar · toprak analizi';listen(labApp,'click',()=>{showDrawer(null);tabletPage(labPanel);});watchActions.append(labApp);
 const labPanel=document.createElement('section');labPanel.className='colony-drawer ops-lab';labPanel.hidden=true;document.body.append(labPanel);
 let lastLabPhase;
 listen(window,'colony:state',()=>{if(activeTabletPanel!==labPanel)return;const lab=wristDetail.lifeSupport?.lab;if(lastLabPhase===lab?.phase&&labPanel.childElementCount)return;lastLabPhase=lab?.phase;labPanel.replaceChildren();const title=document.createElement('h2');title.textContent='Toprak analiz laboratuvarı';const status=document.createElement('p');status.textContent=lab?.phase==='scanning'?'Numune taranıyor…':lab?.phase==='complete'?'Analiz tamamlandı':'REG-01 numunesi hazır';labPanel.append(title,status);if(lab?.result){const result=document.createElement('p');result.textContent=`Su buzu %${lab.result.waterIcePercent} · Demir oksit %${lab.result.ironOxidePercent} · Perklorat: tespit edildi. Arıtma ve besin takviyesi gerekli. Temsili oyun verisidir.`;labPanel.append(result);}const button=document.createElement('button');button.type='button';button.textContent=lab?.phase==='complete'?'Yeniden analiz et':'Analizi başlat';button.disabled=lab?.phase==='scanning';button.onclick=()=>window.dispatchEvent(new CustomEvent('colony:analyze-soil'));labPanel.append(button);});
+const fieldTablet=mountFieldTablet({getDetail:()=>wristDetail,onOpen:tabletPage});
+for(const [page,title] of [['radiation','Radyasyon'],['vision','Görüntü analizi'],['ai','Yerel yapay zekâ']]){
+  const button=document.createElement('button');
+  button.type='button';
+  button.textContent=title;
+  listen(button,'click',()=>{
+    window.dispatchEvent(new CustomEvent('colony:tablet-dismiss'));
+    showDrawer(null);
+    fieldTablet.open(page);
+  });
+  watchActions.append(button);
+}
+listen(window,'pagehide',event=>{if(!event.persisted)fieldTablet.dispose();});
+if(import.meta.hot)import.meta.hot.dispose(()=>fieldTablet.dispose());
+const sourcesApp=document.createElement('button');
+sourcesApp.type='button';
+sourcesApp.textContent='NASA verileri ve kaynaklar';
+listen(sourcesApp,'click',()=>{
+  window.dispatchEvent(new CustomEvent('colony:tablet-dismiss'));
+  showDrawer('realism-drawer');
+});
+watchActions.append(sourcesApp);
 document.querySelector('.ares-screen').append(watchActions);
 const managementToggle=document.createElement('button');managementToggle.type='button';managementToggle.className='ares-management-toggle';managementToggle.textContent='UYGULAMALAR';document.querySelector('.ares-footer').append(managementToggle);listen(managementToggle,'click',()=>{if(activeTabletPanel){window.dispatchEvent(new CustomEvent('colony:tablet-dismiss'));showDrawer(null);watchActions.hidden=false;content.hidden=true;managementToggle.textContent='DURUMA DÖN';return;}watchActions.hidden=!watchActions.hidden;content.hidden=!watchActions.hidden;managementToggle.textContent=watchActions.hidden?'UYGULAMALAR':'DURUMA DÖN';});
 listen(window,'colony:tablet-panel',e=>{if(!e.detail?.panel)return;showDrawer(null);tabletPage(e.detail.panel);});
 listen(window,'colony:tablet-panel-closed',()=>{showDrawer(null);watchActions.hidden=false;content.hidden=true;managementToggle.textContent='DURUMA DÖN';});
 for (const button of document.querySelectorAll('[data-close-drawer]')) listen(button, 'click', () => closeDrawer());
 
-listen(document, 'keydown', event => {
-  if (event.code !== 'Escape' || !activeDrawer || document.pointerLockElement === canvas) return;
-  // Consume Escape only when closing our drawer; leave terminal and FPS handling alone otherwise.
+const surfaceAction=action=>window.dispatchEvent(new CustomEvent('colony:surface-settings',{detail:action}));
+function openSettings() {
+  if (settings.open) return;
+  wrist.setRaised(false,true);
+  document.exitPointerLock?.();
+  settings.showModal();
+  surfaceAction('pause');
+}
+listen(document.getElementById('surface-settings-toggle'),'click',openSettings);
+listen(settings,'click',event=>{
+  const action=event.target.closest('[data-surface]')?.dataset.surface;
+  if(action==='resume')settings.close();
+  else if(action)surfaceAction(action);
+});
+listen(settings,'close',()=>{surfaceAction('resume');canvas.focus({preventScroll:true});});
+listen(window,'keydown',event=>{
+  if(event.code!=='Escape'||event.repeat||settings.open||wrist.raised)return;
   event.preventDefault();
   event.stopImmediatePropagation();
-  closeDrawer();
-}, { capture: true });
+  openSettings();
+},{capture:true});
 
 listen(document, 'pointerlockchange', () => {
   const locked = document.pointerLockElement === canvas;

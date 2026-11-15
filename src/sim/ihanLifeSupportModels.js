@@ -19,17 +19,20 @@ export function stepAir(state,hours,{powerKW=3.5,plantsKgHour=0}={},config=AIR_D
 }
 
 export const WATER_DEFAULTS=Object.freeze({extractionKW:2,litersPerHour:20/6,recoveryKW:.3,recoveryLitersHour:5,recoveryFraction:.85,tankCapacityL:100,iceWaterFraction:.5,captureEfficiency:.8,crew:3,waterPersonDay:3.52});
-export function createWaterState(){return{cleanL:30,wasteL:0,iceKg:1000,extractedL:0,recoveredL:0,consumedL:0,unservedL:0,energyKWh:0,elapsedHours:0};}
-export function stepWater(state,hours,{powerKW=2.3,extract=true,recycle=true}={},config=WATER_DEFAULTS){
+export function createWaterState(){return{cleanL:30,wasteL:0,iceKg:1000,extractedL:0,recoveredL:0,irrigatedL:0,consumedL:0,unservedL:0,energyKWh:0,elapsedHours:0};}
+export function stepWater(state,hours,{powerKW=2.3,extract=true,recycle=true,extractionDuty=1,irrigationLiters=0}={},config=WATER_DEFAULTS){
  if(!Number.isFinite(hours)||hours<0||hours>24.66)throw Error('Step must be 0–24.66 hours');if(!Number.isFinite(powerKW)||powerKW<0)throw Error('Invalid power');
  const s={...state};let remaining=powerKW;
- const recycler=recycle&&remaining+1e-9>=config.recoveryKW;if(recycler)remaining-=config.recoveryKW;
- const extractor=extract&&remaining+1e-9>=config.extractionKW;
+ const roomAtStart=s.cleanL<config.tankCapacityL;
+ const recycler=roomAtStart&&recycle&&remaining+1e-9>=config.recoveryKW;if(recycler)remaining-=config.recoveryKW;
+ const extractor=roomAtStart&&extract&&extractionDuty>0&&remaining+1e-9>=config.extractionKW*extractionDuty;
  const demand=config.crew*config.waterPersonDay/24*hours,consumed=Math.min(s.cleanL,demand);s.cleanL-=consumed;s.consumedL+=consumed;s.unservedL+=demand-consumed;s.wasteL+=consumed;
  const processed=recycler?Math.min(s.wasteL,config.recoveryLitersHour*hours,(config.tankCapacityL-s.cleanL)/config.recoveryFraction):0;
  const recovered=processed*config.recoveryFraction;s.wasteL-=processed;s.cleanL+=recovered;s.recoveredL+=recovered;
+ const irrigated=Math.min(s.cleanL,Math.max(0,irrigationLiters));
+ s.cleanL-=irrigated;s.irrigatedL=(s.irrigatedL??0)+irrigated;
  const recoveredPerKg=config.iceWaterFraction*config.captureEfficiency;
- const water=extractor?Math.min(config.litersPerHour*hours,s.iceKg*recoveredPerKg,config.tankCapacityL-s.cleanL):0;s.iceKg-=water/recoveredPerKg;s.cleanL+=water;s.extractedL+=water;
+ const water=extractor?Math.min(config.litersPerHour*hours*extractionDuty,s.iceKg*recoveredPerKg,config.tankCapacityL-s.cleanL):0;s.iceKg-=water/recoveredPerKg;s.cleanL+=water;s.extractedL+=water;
  const extractionEnergy=water/config.litersPerHour*config.extractionKW;
  const recyclingEnergy=processed/config.recoveryLitersHour*config.recoveryKW;
  s.energyKWh+=extractionEnergy+recyclingEnergy;s.elapsedHours+=hours;

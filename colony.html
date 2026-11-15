@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="tr">
 <head>
  <meta charset="utf-8">
@@ -16,6 +16,22 @@
   <div id="fps-hud"><div id="helmet"></div><div id="reticle" aria-hidden="true"></div><div id="aim"></div></div>
   <div id="scene-hud"></div>
  </section>
+ <button id="surface-settings-toggle" type="button" aria-haspopup="dialog" aria-label="Yüzey ayarları">Esc</button>
+ <dialog id="surface-settings" aria-labelledby="surface-settings-title">
+   <header><h2 id="surface-settings-title">Yüzey ayarları</h2><button type="button" data-surface="resume" aria-label="Ayarları kapat" autofocus>×</button></header>
+   <div class="surface-settings-tools">
+     <button type="button" data-surface="day">Gündüze geç</button>
+     <button type="button" data-surface="night">Geceye geç</button>
+     <button type="button" data-surface="audio">Sesi kapat</button>
+     <button type="button" data-surface="lamp">Kafa lambasını aç</button>
+   </div>
+   <p class="surface-settings-note">Gündüz ve gece seçimi Mars saatini ve koloni simülasyonunu ileri alır.</p>
+   <nav aria-label="Görev bölümleri">
+     <a href="./flight.html?bolum=transfer">Transfere dön ↗</a>
+     <a href="./index.html">Ana menüye dön ↗</a>
+   </nav>
+   <button class="surface-resume" type="button" data-surface="resume">Mars’a dön</button>
+ </dialog>
  <div class="colony-ui">
   <header class="colony-topbar">
    <a class="colony-identity" href="./" aria-label="Uçuş görev kontrolüne dön"><span class="colony-mark" aria-hidden="true">M<span>01</span></span><span><b>MARS’A İLK KOLONİ</b><small>YÜZEY GÖREVİ / DÜZ OVA</small></span></a>
@@ -135,7 +151,7 @@
      <p class="muted">Merkez kubbenin önündeki hava kilidine yaklaş ve E’ye bas. İçeride yan tünellerden diğer kubbelere geç; çıkmak için merkez kubbenin kapısına dön.</p>
      <p id="view-help">Modülü seç ve zeminde veya çatıda istediğin noktaya tıkla · Sürükleyerek döndür</p>
      <p class="muted">Sahneye tıkla: fareyi yakala · WASD: yürü · Oklar / fare: bak · E: etkileşim · R: yaşam modülünün çatısına eriş / geri dön · Esc: paneli kapat veya üs planına dön.</p>
-     <p class="muted">Alt / Q: kol terminali · L: kafa lambası · [ / ]: yüzey zaman hızı. Kaynak hesabı için “Bir sol ilerlet” kullanılır.</p>
+     <p class="muted">Alt / Q / Tab: KERK tableti · Esc: ayarlar · L: kafa lambası · [ / ]: yüzey zaman hızı. Kaynak hesabı için “Bir sol ilerlet” kullanılır.</p>
      <details class="file-row"><summary>Ekip karakteri yükle</summary><label>Seçili astronot için GLB <input id="character-file" type="file" accept=".glb,model/gltf-binary"></label><small id="character-status" role="status">Varsayılan astronotlar kullanımda.</small></details>
      <p><small id="nasa-status" role="status">NASA modelleri yükleniyor…</small></p><p><button id="rover" type="button">NASA Perseverance modelini göster</button></p><small id="rover-status" role="status"></small>
      <footer class="group"><h3>Veri ve model kaynakları</h3><p>Düz Ova üssü ve düz arazi: İhan · Prosedürel konsept, ölçülmüş Jezero arazisi değildir.</p><a href="https://science.nasa.gov/3d-resources/astronaut/">Astronot · NASA</a> · <a href="https://science.nasa.gov/3d-resources/mars-2020-perseverance-rover/">Perseverance · NASA/JPL</a> · <a href="https://www.nasa.gov/science-research/nasa-plant-researchers-explore-question-of-deep-space-food-crops/">NASA bitki araştırması</a><p>NASA Space Apps 2026 · Sivas</p></footer>

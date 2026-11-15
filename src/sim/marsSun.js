@@ -9,8 +9,8 @@ import { AU } from './constants.js';
 const RAD = Math.PI / 180;
 const DAY = 86400;
 export const MARS_SOL_SECONDS = 1.0274912517 * DAY;
-// NASA Mars 2020 landing site (rounded): https://science.nasa.gov/mission/mars-2020-perseverance/location/
-export const JEZERO = Object.freeze({ latitude: 18.38 * RAD, longitude: 77.58 * RAD });
+// Octavia E. Butler Landing, NASA GISS: https://www.giss.nasa.gov/tools/mars24/help/landers.html
+export const JEZERO = Object.freeze({ latitude: 18.44 * RAD, longitude: 77.45 * RAD });
 const wrap = (n, period) => ((n % period) + period) % period;
 const sin = deg => Math.sin(deg * RAD);
 const cos = deg => Math.cos(deg * RAD);

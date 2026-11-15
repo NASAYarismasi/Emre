@@ -78,22 +78,23 @@ export function createAutomaticRecovery(snapshot={}) {
       if(!state) return null
       secondsSinceTrip+=seconds
       if(!state.isolated && secondsSinceTrip>=2) log(commandBlackStart(state,"isolate"))
+      const bankBefore=state.bank
       if(state.phase==="outage" && state.isolated && secondsSinceTrip>=4 && !state.attempted) {
         state.attempted=true
         log(commandBlackStart(state,"inverter"))
       }
       const wasReady=state.phase==="ready"
       const wasRestored=state.phase==="restored"
-      const prior=state.bank
       log(stepBlackStart(state,seconds))
-      const drawKW=Math.max(0,prior-state.bank)*3600/seconds
+      const drawKW=Math.max(0,bankBefore-state.bank)*3600/seconds
       if(wasReady && state.phase==="ready") {
         stableSeconds+=seconds
         if(stableSeconds>=2) log(commandBlackStart(state,"habitat"))
       }
       grid.banks[3]=state.bank
       grid.battery=grid.banks.reduce((sum,value)=>sum+value,0)
-      const life=wasRestored?state.habitatKW:0
+      const life=wasRestored?Math.min(HABITAT_KW,drawKW*GRID.dischargeEfficiency*HABITAT_KW/(HABITAT_KW+STANDBY_KW)):0
+      grid.energy.conversionLoss+=Math.max(0,drawKW-life)*seconds/3600
       grid.loadEnergy.habitat+=life*seconds/3600
       grid.dailyShortfall+=(6-life)*seconds/3600
       const plantGas=stepGreenhouseGas(grid,{elevation:0,transmission:0,ledFraction:0},seconds/3600)

@@ -1,5 +1,7 @@
+import { GRID, TANK_L } from '../colony/ihan/power/mars-power.mjs';
+import { MOXIE_TANK_KG } from '../colony/ihan/power/live-grid.mjs';
 /**
- * ARES Mark-IV wrist terminal — original arm, case and orange display design by Samet.
+ * KERK Mark-IV wrist terminal — original arm, case and orange display design by Samet.
  * DOM/CSS adaptation shares one lightweight overlay between flight and colony.
  * No extra renderer, texture, simulated medical readings or independent mission clock.
  */
@@ -21,7 +23,7 @@ function screenMarkup(data, screen) {
       const resource = data.resources?.[key] ?? {};
       return card(label, reading(colony ? resource.sols : resource.days, colony ? 'sol' : 'gün'),
         colony ? `${reading(resource.personSols, 'kişi-sol')} · ${reading(resource.days, 'Dünya günü')}` : reading(resource.kg, 'kg'));
-    }).join('')}</div><p class="ares-note">${colony ? `${data.livingCrew} yaşayan mürettebatın tüketimine göre. Üretim kredisi dahil değildir.` : `${data.crew?.length ?? 0} kişi · NASA BVAD günlük tüketimi · geri kazanım kredisi yok.`}</p>`;
+    }).join('')}</div><p class="ares-note">${colony ? `${data.livingCrew} yaşayan mürettebatın tüketimine göre. Üretim kredisi dahil değildir.` : `${data.crew?.length ?? 0} kişi · NASA Ames günlük tüketim referansı · geri kazanım kredisi yok.`}</p>`;
   }
   if (screen === 2) {
     if (colony) {
@@ -42,37 +44,55 @@ function screenMarkup(data, screen) {
 }
 
 function colonyDashboard(data,screen) {
-  const t=data.lifeSupport??{}, air=t.air??{},water=t.water??{},energy=data.energy??{};
-  const grid=t.electrical, battery=grid?.state?.battery??energy.battery, batteryUnit=grid?'kWh':'birim';
+  const t=data.lifeSupport??{}, air=t.air??{},water=t.water??{};
+  const grid=t.electrical, flow=grid?.flow, battery=grid?.state?.battery;
   const tile=(label,value,note,tone='')=>`<article class="ops-metric ${tone}"><small>${escape(label)}</small><strong>${escape(value)}</strong><span>${escape(note)}</span></article>`;
+  const waterReserve=Number.isFinite(t.waterL)?reading(Math.floor(t.waterL/TANK_L*1000)/10,'%',1):'—';
+  const oxygen=grid?.state?.oxygen;
+  const oxygenLevel=Math.floor(oxygen/MOXIE_TANK_KG*1000)/100;
+  const oxygenReserve=Number.isFinite(oxygenLevel)?`${format(oxygenLevel,oxygenLevel===10?0:2)} / 10`:'—';
   if(screen===3)return `<div class="ops-heading"><b>MÜRETTEBAT</b><span>${data.livingCrew} kişi görevde</span></div><div class="ares-crew">${(data.crew??[]).map(p=>`<article><div><b>${escape(p.name)}</b><span>${escape(p.roleLabel)}</span></div><strong>${p.alive?reading(p.health,'%',0):'YAŞAM BULGUSU YOK'}</strong></article>`).join('')}</div>`;
-  if(screen===2)return `<div class="ops-heading"><b>ENERJİ MERKEZİ</b><span>Canlı tesis telemetrisi</span></div><div class="ops-grid">${tile('TESİSLERE AYRILAN GÜÇ',reading(t.availableKW,'kW'),'Yaşam desteği bütçesi')}${tile('TESİS TÜKETİMİ',reading(t.powerKW,'kW'),'Hava + su sistemleri')}${tile('BATARYADA DEPOLANAN',reading(battery,batteryUnit),grid?'5 grup · toplam 180 kWh':'Koloni enerji birimi · kWh değildir','amber')}${tile('HARCANAN ENERJİ',reading(t.spentKWh,'kWh'),'Bu sol · yaşam desteği','amber')}</div><dl>${row('Son sol güneş üretimi',reading(energy.generation,'birim'))}${row('Son sol batarya kapasitesi',reading(energy.capacity,'birim'))}</dl>`;
-  if(screen===1)return `<div class="ops-heading"><b>YAŞAM DESTEĞİ</b><span>Üretim ve rezerv ayrı izlenir</span></div><div class="ops-grid">${tile('ÜRETİLEN SU',reading(water.extractedL,'L'),'Buzdan çıkarılan · toplam','blue')}${tile('REZERV SU',reading(t.waterL,'L'),'Temiz su deposu','blue')}${tile('ÜRETİLEN O₂',reading(air.generatedKg,'kg'),'Oksijen üretimi · toplam')}${tile('REZERV O₂',reading(t.oxygenKg,'kg'),'Kullanılabilir oksijen')}</div><dl>${row('Geri kazanılan su',reading(water.recoveredL,'L'))}${row('Atık su',reading(water.wasteL,'L'))}${row('Giderilen CO₂',reading(air.removedCO2Kg,'kg'))}</dl>`;
-  return `<div class="ops-heading"><b>ÜS KONTROL MERKEZİ</b><span>LMST ${escape(data.lmst??'—')}</span></div><div class="ops-grid">${tile('REZERV SU',reading(t.waterL,'L'),`Üretilen ${reading(water.extractedL,'L')}`,'blue')}${tile('REZERV OKSİJEN',reading(t.oxygenKg,'kg'),`Üretilen ${reading(air.generatedKg,'kg')}`)}${tile('TESİS GÜCÜ',reading(t.powerKW,'kW'),`Bütçe ${reading(t.availableKW,'kW')}`,'amber')}${tile('BATARYA',reading(battery,batteryUnit),grid?'5 grup · toplam 180 kWh':'Koloni enerji birimi','amber')}</div><div class="ops-task"><small>AKTİF GÖREV</small><b>${escape(data.activeTask)}</b></div>`;
+  if(screen===2)return `<div class="ops-heading"><b>ELEKTRİK VE ENERJİ TÜKETİMİ</b></div>
+    <div class="ops-grid">
+      ${tile('GÜNEŞTEN GELEN',reading(flow?.solar,'kW',2),`Baraya ${reading(flow?.solarToBus,'kW',2)}`)}
+      ${tile('ANLIK TÜKETİM',reading(flow?.totalConsumption,'kW',2),`Toplam tüketilen ${reading(t.spentKWh,'kWh',2)}`)}
+      ${tile('BATARYA REZERVİ',reading(battery,'kWh',2),`Kapasite ${GRID.capacity} kWh`,'amber')}
+      ${tile('GEREKEN GECE REZERVİ',reading(grid?.live?.reserve,'kWh',2), 'Habitat, ısıtma ve sera','amber')}
+    </div><dl>
+      ${row('Bataryaya giren / çıkan',`${reading(flow?.charging,'kW',2)} / ${reading(flow?.totalDischarge,'kW',2)}`)}
+      ${row('Kablo / dönüşüm kaybı',`${reading(flow?.feederLoss,'kW',2)} / ${reading(flow?.totalConversionLoss,'kW',2)}`)}
+      ${row('Kullanılamayan güneş gücü',reading(flow?.curtailed,'kW',2))}
+    </dl>`;
+  if(screen===1)return `<div class="ops-heading"><b>YAŞAM DESTEĞİ</b></div><div class="ops-grid">
+    ${tile('BUZDAN ÇIKARILAN SU',reading(water.extractedL,'L'),'Görev toplamı','blue')}
+    ${tile('TEMİZ SU REZERVİ',waterReserve,`${reading(t.waterL,'L')} / ${TANK_L} L`,'blue')}
+    ${tile('MOXIE O₂ ÜRETİMİ',reading(grid?.state?.oxygenProduced,'kg',3),'Görev toplamı')}
+    ${tile('MOXIE O₂ REZERVİ',oxygenReserve,`${reading(oxygen,'kg',3)} / ${MOXIE_TANK_KG} kg`)}
+    </div><dl>${row('Habitat oksijen rezervi',reading(t.oxygenKg,'kg',3))}${row('Geri kazanılan su',reading(water.recoveredL,'L'))}${row('Atık su',reading(water.wasteL,'L'))}${row('Giderilen CO₂',reading(air.removedCO2Kg,'kg'))}</dl>`;
+  return `<div class="ops-heading"><b>ÜS KONTROL MERKEZİ</b><span>LMST ${escape(data.lmst??'—')}</span></div><div class="ops-grid">${tile('REZERV SU',reading(t.waterL,'L'),`Üretilen ${reading(water.extractedL,'L')}`,'blue')}${tile('REZERV OKSİJEN',reading(t.oxygenKg,'kg'),`Üretilen ${reading(air.generatedKg,'kg')}`)}${tile('TESİS GÜCÜ',reading(t.powerKW,'kW'),`Bütçe ${reading(t.availableKW,'kW')}`,'amber')}${tile('BATARYA',reading(battery,'kWh'),`Kapasite ${GRID.capacity} kWh`,'amber')}</div><div class="ops-task"><small>AKTİF GÖREV</small><b>${escape(data.activeTask)}</b></div>`;
 }
 
 /**
- * @param {{root: HTMLElement, getData: () => object|null, onToggle?: (raised: boolean) => void}} options
+ * @param {{root: HTMLElement, getData: () => object|null, onToggle?: (raised: boolean) => void, surfaceShortcuts?: boolean, canToggle?: () => boolean}} options
  * getData returns flightWristData()/colonyWristData(). onToggle is optional host UI synchronization.
  */
-export function mountWristTerminal({ root, getData, onToggle = () => {} }) {
+export function mountWristTerminal({ root, getData, onToggle = () => {}, surfaceShortcuts = false, canToggle = () => true }) {
   const doc = root.ownerDocument, win = doc.defaultView;
   const host = doc.createElement('aside');
   host.className = 'ares-wrist';
-  host.setAttribute('aria-label', 'ARES kol bilgisayarı');
+  host.setAttribute('aria-label', 'KERK kol bilgisayarı');
   host.setAttribute('aria-hidden', 'true');
   const artBase = `${import.meta.env.BASE_URL}art/`;
   host.innerHTML = `<div class="ares-arm" inert><div class="ares-hold">
-    <img class="ares-grip ares-grip-back" src="${artBase}eva-tablet-grip-back.svg" alt="" aria-hidden="true" draggable="false" width="900" height="620">
     <section class="ares-case"><i class="ares-screw ares-screw-tl"></i><i class="ares-screw ares-screw-tr"></i><i class="ares-screw ares-screw-bl"></i><i class="ares-screw ares-screw-br"></i>
-      <div class="ares-hardware" aria-hidden="true"><span>ARES / EVA</span><i></i><i></i><i></i><b>IV</b></div>
-      <div class="ares-screen"><header class="ares-header"><b><i></i> ARES <span>MARK-IV</span></b><button type="button" class="ares-close" aria-label="Kolu indir">ESC ×</button></header>
+      <div class="ares-hardware" aria-hidden="true"><span>KERK / EVA</span><i></i><i></i><i></i><b>IV</b></div>
+      <div class="ares-screen"><header class="ares-header"><b><i></i> KERK <span>MARK-IV</span></b><button type="button" class="ares-close" aria-label="Kolu indir">ESC ×</button></header>
       <div class="ares-location"><span data-ares-phase></span><time data-ares-clock></time></div>
       <nav class="ares-tabs" aria-label="Terminal ekranları">${['DURUM', 'YAŞAM DESTEĞİ', 'SEYİR', 'MÜRETTEBAT'].map((name, index) => `<button type="button" data-ares-tab="${index}" aria-pressed="${index === 0}">${name}</button>`).join('')}</nav>
-      <p class="ares-notice" aria-live="polite"></p><div class="ares-content"></div><div class="ares-panel-slot" hidden></div><footer class="ares-footer"><span>TAB · TABLETİ KAPAT</span><span>TEKERLEK · SAYFA</span><b data-ares-page>01 / 04</b></footer></div>
-      <div class="ares-case-label" aria-hidden="true">EVA · GÖREV TERMİNALİ <span>ARES—01</span></div>
+      <p class="ares-notice" aria-live="polite"></p><div class="ares-content"></div><div class="ares-panel-slot" hidden></div><footer class="ares-footer"><span>${surfaceShortcuts?'ALT':'TAB'} · TABLETİ KAPAT</span><span>TEKERLEK · SAYFA</span><b data-ares-page>01 / 04</b></footer></div>
+      <div class="ares-case-label" aria-hidden="true">EVA · GÖREV TERMİNALİ <span>KERK—01</span></div>
     </section>
-    <img class="ares-grip ares-grip-front" src="${artBase}eva-tablet-grip-front.svg" alt="" aria-hidden="true" draggable="false" width="900" height="620">
+    <img class="ares-grip ares-grip-front" src="${artBase}eva-gloves.png" alt="" aria-hidden="true" draggable="false" width="900" height="620">
     </div></div>`;
   root.append(host);
   const arm = host.querySelector('.ares-arm'), content = host.querySelector('.ares-content');
@@ -122,14 +142,15 @@ export function mountWristTerminal({ root, getData, onToggle = () => {} }) {
   on(win, 'keydown', event => {
     const editable = /^(INPUT|TEXTAREA|SELECT)$/.test(event.target?.tagName) || event.target?.isContentEditable;
     const close = event.key === 'Escape' || event.code === 'Escape';
-    const tab = event.key === 'Tab' || event.code === 'Tab';
+    const toggleKey = event.key === 'Tab' || event.code === 'Tab' ||
+      surfaceShortcuts && ['AltLeft', 'AltRight', 'KeyQ'].includes(event.code);
+    if (!canToggle()) return;
     if (editable && !close || event.metaKey || event.ctrlKey) return;
-    if (!(tab || raised && close)) return;
-    // Capture before the flight's old Q action and the colony document-level FPS bindings.
-    // Pointer lock is deliberately retained: Alt/Q/Tab work entirely from the keyboard.
+    if (!(toggleKey || raised && close)) return;
+    // The overlay owns its shortcuts before gameplay handles the same key.
     event.preventDefault(); event.stopImmediatePropagation();
     if (event.repeat) return;
-    if (tab) toggle();
+    if (toggleKey) toggle();
     else if (close) setRaised(false, true);
 
   }, true);

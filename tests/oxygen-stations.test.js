@@ -31,3 +31,16 @@ it('cuts MOXIE electrical demand when all tanks are full',()=>{
   expect(live.gas.tanksKg).toEqual([5,5,5]);
   expect(live.groups[2].charge).toBeGreaterThan(0);
 });
+
+it('bills only actual MOXIE runtime near 15 kg and keeps the interlock until reserve drops',()=>{
+  const state=createGridState();
+  state.oxygen=14.99;
+  const options={season:0,transmission:1,panelDust:0,closed:true,lamp:1,drill:false,faults:{}};
+  const flow=stepMicrogrid(state,6,1,options);
+  expect(state.oxygen).toBe(15);
+  expect(flow.moxie.consumption).toBeCloseTo(.5,8);
+  state.oxygen=14.99;
+  expect(stepMicrogrid(state,6,1,options).moxie.consumption).toBe(0);
+  state.oxygen=14.8;
+  expect(stepMicrogrid(state,6,1,options).moxie.consumption).toBeCloseTo(2.7,8);
+});

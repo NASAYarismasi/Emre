@@ -31,14 +31,17 @@ const STRIDE_HZ = .75 // steps per second per leg at 1 m/s; low gravity → long
 /** Jointed limbs of team-astronaut-walk.glb (origins at shoulder/hip). Re-read after model swaps. */
 function limbs(actor) {
   const found = { armL: [], armR: [], legL: [], legR: [] }
-  actor.traverse(o => { const m = /^Walk_(armL|armR|legL|legR)/.exec(o.name); if (m) found[m[1]].push(o) })
+  actor.traverse(o => { const m = /^Walk_(armL|armR|legL|legR)/.exec(o.name); if (m) found[m[1]].push({node:o,rest:o.quaternion.clone()}) })
   return found
 }
-function swing(parts, arms, legsL, legsR) {
-  for (const o of parts.armL) o.rotation.x = arms
-  for (const o of parts.armR) o.rotation.x = -arms
-  for (const o of parts.legL) o.rotation.x = legsL
-  for (const o of parts.legR) o.rotation.x = legsR
+const swingAxis = new T.Vector3(1,0,0)
+const swingRotation = new T.Quaternion()
+function swing(parts, leftArm, rightArm, leftLeg, rightLeg) {
+  const angles={armL:leftArm,armR:rightArm,legL:leftLeg,legR:rightLeg}
+  for(const [key,joints] of Object.entries(parts)){
+    swingRotation.setFromAxisAngle(swingAxis,angles[key])
+    for(const {node,rest} of joints)node.quaternion.copy(rest).multiply(swingRotation)
+  }
 }
 
 /** Inserts a detour point when the straight segment a→b crosses a keep-out circle. Pure. */
@@ -170,12 +173,12 @@ export function createCrewAgents({ crewModels, groundY }) {
           }
           actor.rotation.x = 0
           // Low-g gait: slow, slightly floaty steps (Mars g = 3.71 m/s²).
-          const s=Math.sin(agent.phase*Math.PI*2*STRIDE_HZ);swing(agent.parts,s*.28,s*.42,-s*.42);actor.position.y=groundY(actor.position.x,actor.position.z)+Math.abs(s)*.045
+          const s=Math.sin(agent.phase*Math.PI*2*STRIDE_HZ);swing(agent.parts,s*.28,-s*.28,s*.42,-s*.42);actor.position.y=groundY(actor.position.x,actor.position.z)+Math.abs(s)*.045
           label.set(name + ' · Yolda', site.text.split(' · ')[0] + ' için yürüyor')
         } else if (agent.mode === 'working') {
           // Slow lean in and out, as if inspecting/handling hardware at chest height.
           actor.position.y = groundY(actor.position.x, actor.position.z)
-          actor.rotation.x=.06+Math.sin(agent.phase*1.3)*.04;const w=Math.sin(agent.phase*2.1);for(const o of agent.parts.armL)o.rotation.x=-.95+w*.18;for(const o of agent.parts.armR)o.rotation.x=-.95-w*.18;for(const o of [...agent.parts.legL,...agent.parts.legR])o.rotation.x=0
+          actor.rotation.x=.06+Math.sin(agent.phase*1.3)*.04;const w=Math.sin(agent.phase*2.1);swing(agent.parts,-.85+w*.18,-.85-w*.18,0,0)
           label.set(name + (person.role ? ' · ' + { production: 'Üretim', maintenance: 'Bakım', construction: 'İnşaat' }[person.role] : ''), site.text)
         }
       })

@@ -1,3 +1,4 @@
+import {readMenuPreferences} from '../menu/preferences.js';
 import { createScenario } from '../sim/scenarios.js';
 import { createCountdown } from '../sim/countdown.js';
 import { createDebris } from '../sim/debris.js';
@@ -14,9 +15,14 @@ import { createHUD } from '../ui/hud.js';
 import { createPacingDirector, createPacingPlan } from './pacing.js';
 
 export async function bootstrap(){
+  const entry=new URLSearchParams(window.location.search).get('bolum');
+  const entryChapter=new Map([['kalkis','launch'],['transfer','transfer'],['inis','mars-orbit']]).get(entry);
   let mission=createScenario('launch'),countdown=createCountdown(),debris=createDebris(),trajectory=[],exhaustHistory=[],ready=false,chapter='launch';
   let previousState,currentState,manualTime=false,disposed=false,frameDelta=1/60,lastPhase='PRELAUNCH',fps=60,notice='';
-  const ui={manual:false,help:false,about:false,watch:false,title:true,notice:''},audio=createAudio(),store=createStore();
+  const ui={manual:false,help:false,about:false,watch:false,title:!entryChapter,notice:''},audio=createAudio(),store=createStore();
+  const preferences=readMenuPreferences();
+  audio.setVolume(preferences.master/100);
+  if(preferences.muted)audio.toggleMute();
   const pacing=createPacingDirector(createPacingPlan());
   const snapshot=()=>({...captureRenderState(mission,countdown,debris),trajectory:[...trajectory],exhaust:exhaustHistory});
   const canManual=()=>['ASCENT','TMI_BURN','MOI_BURN'].includes(mission.state.phase);
@@ -41,7 +47,7 @@ export async function bootstrap(){
     volume(value){audio.start();audio.setVolume(value);},mute(){audio.start();audio.toggleMute();sync();},
     reset(){replaceMission(createScenario('launch'),true);chapter='launch';sync();}
   };
-  const hud=createHUD(commands);
+  const hud=createHUD(commands,{showTitle:ui.title});
   const assets=await loadAssets((done,total)=>hud.progress(done,total));
   if(disposed){assets.dispose();return;}
   const graphics=createRenderer(document.getElementById('scene')),cameras=createCameras(graphics.canvas);
@@ -144,7 +150,6 @@ export async function bootstrap(){
   window.missionControl={...commands,resumeRealtime(){manualTime=false;previous=performance.now();}};
   function dispose(){if(disposed)return;disposed=true;ready=false;window.removeEventListener('pagehide',dispose);graphics.renderer.setAnimationLoop(null);input.dispose();manager.exit();cameras.dispose();graphics.dispose();assets.dispose();hud.dispose();store.dispose();audio.dispose();delete window.advanceTime;delete window.render_game_to_text;delete window.missionControl;}
   if(import.meta.hot)import.meta.hot.dispose(dispose);window.addEventListener('pagehide',dispose,{once:true});
-  // Read the demo deep link once; reset always stays on the title screen.
-  if(new URLSearchParams(window.location.search).get('bolum')==='inis')commands.startChapter('mars-orbit');
+  if(entryChapter)commands.startChapter(entryChapter);
   else loop.advance(0);
 }

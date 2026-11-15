@@ -4,7 +4,7 @@ import { bootstrap } from '../src/core/app.js';
 // Exercise the real HUD bindings, input, commands, fixed loop and mission in Node.
 // Only hardware/browser presentation adapters are replaced; no browser is opened.
 vi.mock('../src/render/assets.js',()=>({loadAssets:async()=>({failures:[],dispose(){}})}));
-vi.mock('../src/core/audio.js',()=>({createAudio:()=>({start(){},reset(){},update(){},dispose(){},muted:true})}));
+vi.mock('../src/core/audio.js',()=>({createAudio:()=>({setVolume:vi.fn(),start(){},reset(){},update(){},dispose(){},muted:true})}));
 vi.mock('../src/render/renderer.js',()=>({createRenderer:()=>({
   canvas:{},height:720,quality:'Orta',ratio:1,draw(){},dispose(){},
   renderer:{setAnimationLoop(){},info:{render:{calls:0,triangles:0},memory:{}}}
@@ -71,6 +71,7 @@ it('opens ?bolum=inis once, keeps reset on the title, and preserves the direct c
   window.location.search='?bolum=inis';
   await bootstrap();
   expect(state()).toMatchObject({chapter:'mars-orbit',titleScreen:false,phase:'MARS_ORBIT'});
+  expect(root.innerHTML).toContain('<section id="launch-card" aria-label="Ana menü" hidden>');
   expect(typeof window.missionControl.startChapter).toBe('function');
   expect(()=>window.missionControl.startChapter('invalid')).toThrow(RangeError);
   expect(state().phase).toBe('MARS_ORBIT');

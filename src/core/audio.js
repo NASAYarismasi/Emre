@@ -3,7 +3,7 @@ export function createAudio(){let context,master,filter,lowGain,highGain,source,
   function start(){
     if(context){context.resume();return;}
     const Audio=window.AudioContext||window.webkitAudioContext;if(!Audio)return;
-    context=new Audio();master=context.createGain();master.gain.value=volume;master.connect(context.destination);
+    context=new Audio();master=context.createGain();master.gain.value=muted?0:volume;master.connect(context.destination);
     const buffer=context.createBuffer(2,context.sampleRate*4,context.sampleRate);
     let seed=77;const random=()=>((seed=(1664525*seed+1013904223)>>>0)/4294967296)*2-1;
     for(let ch=0;ch<2;ch++){const d=buffer.getChannelData(ch);let brown=0;for(let i=0;i<d.length;i++){brown=(brown+.025*random())/1.025;d[i]=brown*4+random()*.08;}}

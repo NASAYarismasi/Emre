@@ -1,4 +1,4 @@
-﻿# Mars’a İlk Koloni
+# Mars’a İlk Koloni
 
 **NASA Space Apps 2026 · Sivas**
 
@@ -13,7 +13,7 @@ npm install
 npm run dev
 ```
 
-Terminalde gösterilen yerel adresi aç. Ana sayfa `index.html`, yüzey bölümü `colony.html` dosyasıdır.
+Terminalde gösterilen yerel adresi aç. Ana menü `index.html`, uçuş `flight.html`, yüzey bölümü `colony.html` üzerinden açılır. **Yeni Oyun** ile astronot ve bölüm seçilir.
 
 ```powershell
 npm test
@@ -27,7 +27,7 @@ Model, doku ve yazı tipleri yereldir; bağımlılıklar kurulduktan sonra demo 
 
 **Göreve Başla** ile T−10 geri sayımını başlat. Varsayılan otopilot kalkışı ve güvenli kademe ayrılmalarını yönetir. Dünya park yörüngesinde **B** ile Mars transferini başlat; seyirde zaman hızını artır. Mars yakalaması otomatik gerçekleşir. Mars park yörüngesinde tekrar **B** ile yörüngeden çıkış ve iniş başlar.
 
-Güvenli temastan sonra **KOLONİYİ KUR**, kalan iniş yükünü aynı sekmenin `sessionStorage` alanına kaydeder ve koloni sayfasını açar. Doğrudan koloni sayfasına girmek örnek iniş yükünü kullanır; üst çubuk veri kaynağını gösterir.
+Güvenli temastan sonra oyun, kalan iniş yükünü aynı sekmenin `sessionStorage` alanına kaydedip koloniyi otomatik açar. Doğrudan koloni sayfasına girmek örnek iniş yükünü kullanır; üst çubuk veri kaynağını gösterir.
 
 | Kontrol | İşlev |
 |---|---|
@@ -80,7 +80,7 @@ Kol terminali, kafa lambası ve yüzey zaman hızı diğer çalışanların ente
 Uçuş fiziği SI birimleriyle çalışan, DOM ve Three.js içermeyen deterministik bir çekirdektir. Sabit adımda kuvvet integrasyonu, Newton/Kepler yörüngeleri, Hohmann transferi, roket denklemi, yakıt ve yaşam desteği muhasebesi, kuvvet tabanlı Mars girişi ve motorlu iniş bulunur. Yüksek hızda seyir analitik Kepler çözümüyle ilerler.
 
 - [Fizik modeli, kaynaklar ve sınırlar](docs/PHYSICS.md): NASA/JPL gezegen sabitleri, US Standard Atmosphere 1976, NASA Glenn Mars atmosferi, SLS/Orion referansları ve görev varsayımları.
-- [NASA BVAD — NASA/TP-2015-218570](https://ntrs.nasa.gov/citations/20150002905): kişi başına Dünya gününde 0,84 kg oksijen, 3,52 kg içme/yemek hazırlama suyu, 0,62 kg kuru gıda.
+- [NASA Ames · Yaşam desteği, Tablo 1](https://ntrs.nasa.gov/citations/20160005782): kişi başına Dünya gününde 0,84 kg oksijen, 3,52 kg içme/yemek hazırlama suyu, 0,62 kg kuru gıda.
 - [NASA/JPL MOXIE, 2023](https://www.nasa.gov/solar-system/nasas-oxygen-generating-experiment-moxie-completes-mars-mission/): Perseverance üzerindeki teknoloji gösteriminde en yüksek üretim yaklaşık 12 g O₂/saat.
 - [NASA Mars güneş gücü çalışması](https://ntrs.nasa.gov/citations/19910057365), [Dünya bilgi sayfası](https://nssdc.gsfc.nasa.gov/planetary/factsheet/earthfact.html): atmosfer üstünde yaklaşık 590 ve 1361 W/m². Yüzey güneş gücü, toz ve panel veriminden etkilenir; [Opportunity’nin 2018 fırtınası](https://science.nasa.gov/mission/mer-opportunity/) bunun gerçek örneğidir.
 - [NASA/JPL gezegen parametreleri](https://ssd.jpl.nasa.gov/planets/phys_par.html) ve [NASA Mars bilgi sayfası](https://nssdc.gsfc.nasa.gov/planetary/factsheet/marsfact.html): yaklaşık 3,71 m/s² ekvator yerçekimi, 0,6 kPa temsilî yüzey basıncı ve 24 saat 39 dakika 35 saniyelik sol.
@@ -114,7 +114,7 @@ Emre üretir, Samet aktarır, İhan koloni başlangıcında okur. Şema korunur;
 
 `src/sim/` fizik ve görev mantığını, `src/data/` kaynaklı sabitleri, `src/render/` çizimi, `src/ui/` uçuş arayüzünü, `src/core/` oyun döngüsünü taşır. İhan’ın koloni kuralları `src/colony/mars-koloni.mjs` ve `mars-atolye.mjs` içindedir; arayüz bu kuralları değiştirmez.
 
-`npm test` fizik, görev zinciri, koloni devri ve kaynak sözleşmelerini sınar; `npm run build` iki sayfalı üretim paketini oluşturur. `window.render_game_to_text()` ve `window.advanceTime(ms)` otomatik oyun doğrulamasının girişleridir. Görsel test akışı [docs/RENDERING.md](docs/RENDERING.md) içinde açıklanır. Entegre GPU için çözünürlük ve pahalı efektler kalite ayarlarından azaltılabilir.
+`npm test` fizik, görev zinciri, koloni devri ve kaynak sözleşmelerini sınar; `npm run build` üç sayfalı üretim paketini oluşturur. `window.render_game_to_text()` ve `window.advanceTime(ms)` otomatik oyun doğrulamasının girişleridir. Görsel test akışı [docs/RENDERING.md](docs/RENDERING.md) içinde açıklanır. Entegre GPU için çözünürlük ve pahalı efektler kalite ayarlarından azaltılabilir.
 
 ## Ekip
 
@@ -151,3 +151,11 @@ npm run dev
 Terminalde çıkan adresi (genelde `http://localhost:5173/`) Chrome'da aç. Kolonide doğrudan başlamak için `http://localhost:5173/colony.html` adresini kullan.
 
 Git kullanmadan: GitHub'da oturum aç → [dalın ZIP'ini indir](https://github.com/NASAYarismasi/Emre/archive/refs/heads/feature/pro-rebuild.zip) → klasörü aç → içinde `npm install` ve `npm run dev`.
+
+NASA verileri ve oyun varsayımları [kaynak denetiminde](docs/NASA-KAYNAKLARI.md) listelenir.
+
+## KERK saha analizi
+
+Kolonide tableti açıp **Uygulamalar** bölümünden **Radyasyon**, **Görüntü analizi** veya **Yerel yapay zekâ** ekranına gir. Oyun, localhost üzerinden açık olan Ollama hizmetinde kurulu yerel modelleri listeler. Varsayılan olarak mevcutsa `llama3.2:latest` seçilir. Analiz yalnızca düğmeye basıldığında anlık koloni değerlerini ve varsa son görüntü ölçümlerini Ollama'ya yollar. Bu projedeki istekler işlemciyi kullanır. Görüntü taraması parlaklık, kontrast, karanlık alan ve kenar yoğunluğunu tarayıcıda hesaplar.
+
+Kişisel dozimetre Mars simülasyon saatiyle birikir. Yüzey referansı Curiosity RAD'in Gale verilerinden alınır. Habitatın doz hızını yarıya indirmesi oyun varsayımıdır. [NASA RAD](https://ntrs.nasa.gov/citations/20240009831)

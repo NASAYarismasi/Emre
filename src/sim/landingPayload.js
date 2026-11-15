@@ -14,7 +14,7 @@ export const LANDER_SURFACE_SOLS = 4;
  * Colony supply unit (İhan's colony sim): 1 unit = one crew member's need for one sol.
  * The colony consumes `living crew` units of each resource per sol.
  * @param {number} kg remaining mass of the resource aboard
- * @param {number} ratePerPersonDay kg per person per Earth day (NASA BVAD)
+ * @param {number} ratePerPersonDay kg per person per Earth day (NASA Ames, Table 1)
  */
 export function kgToPersonSols(kg, ratePerPersonDay) {
   return kg / (ratePerPersonDay * SOL / DAY);

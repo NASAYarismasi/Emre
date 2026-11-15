@@ -51,5 +51,5 @@ export const LANDER = {
 };
 
 // Metabolic rates kg/person/day; dry food and potable/food-preparation water, no recycling credit.
-// APPROX baseline: https://ntrs.nasa.gov/citations/20150002905 (NASA/TP-2015-218570, BVAD).
+// Exact daily values: NASA Ames NTRS 20160005782, Table 1. https://ntrs.nasa.gov/citations/20160005782
 export const CREW_RATES = Object.freeze({ oxygen: .84, water: 3.52, food: .62 });

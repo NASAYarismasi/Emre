@@ -72,7 +72,7 @@ Bulut alfa haritası, scrub/beton/folyo/kum dokuları, LC-39B geometrisi, Mars a
 | `public/models/colony/team-astronaut.glb` | [NASA Astronaut](https://science.nasa.gov/3d-resources/astronaut/) · İhan’ın `kaynak/public/models/team-astronaut.glb` dosyası, Emre’nin uçuş astronotu | NASA 3D Resources; NASA medya kullanım kuralları ve kaynak istisnaları geçerlidir. GLB değiştirilmedi; sahnede 1,88 m boya ölçeklenir. |
 | `src/colony/scene/jezero.json` | [NASA PDS MGS/MOLA MEGDR](https://pds-geosciences.wustl.edu/missions/mgs/megdr.html), Jezero Krateri 25×25 örnek | Kamu malı veri |
 
-Koloni kuralları, kaynak miktarları, tarım ve atölye değerleri eğitsel oyun birimleridir (İhan, `MARS-ENTEGRASYON.md`). Uçuştan koloniye birim dönüşümü: `src/sim/landingPayload.js` (1 birim = bir astronotun bir sollük ihtiyacı, NASA BVAD oranlarıyla).
+Koloni kuralları, kaynak miktarları, tarım ve atölye değerleri eğitsel oyun birimleridir (İhan, `MARS-ENTEGRASYON.md`). Uçuştan koloniye birim dönüşümü: `src/sim/landingPayload.js` (1 birim = bir astronotun bir sollük ihtiyacı, NASA Ames Tablo 1 oranlarıyla).
 
 <!-- SYNC: procedural surface provenance; no external imagery added. -->
 `src/colony/scene/crater-terrain.mjs` ve `regolith-detail.mjs`, İhan’ın `kaynak/src/crater-ecosystem.mjs` içindeki prosedürel krater profilleri ve 512² regolit detay üreticisinden uyarlanmıştır. Merkezde 60 m çaplı düz oyun sahası, dışta yassı taşlar ve seyreltilmiş instanced çakıl halısı vardır. Yerel yükseklikler ölçülmüş Jezero DEM’i değildir. Mevcut MOLA tabanlı bölgesel ufuk ve YÜZEY’in Mars24 ortamı korunur; HiRISE ortofotosu veya ikinci gökyüzü/ışık sistemi eklenmedi.
@@ -94,7 +94,8 @@ Rover lens adaptation: `src/colony/ova/assets.mjs` disables screen-space transmi
 
 ## Selective Emre integration (097c3aa)
 
-- `team-astronaut-walk.glb`: NASA astronaut derivative with articulated shoulder/hip groups; prepared by Emre (`scripts/pose-walker.py` in source branch), same NASA media conditions as the original astronaut.
+- `team-astronaut-walk.glb`: NASA Astronaut (DigitalSpace Corporation) türevi. Blender’da orijinal üçgenleri ve UV’leri koruyan ağırlıklı omuz/kalça iskeleti eklendi. NASA kaynak modelinin koşulları geçerlidir.
+- `public/art/eva-gloves.png`: Aynı NASA Astronaut modelinin el ve bilek geometrisi Blender’da KERK tabletinin tutuşuna göre pozlanıp saydam görüntüye işlendi. Model ve görsel aynı komutla üretilir. `blender --factory-startup -b --python scripts/pose-walker.py`.
 - `perseverance-wheels.glb`: existing NASA/JPL Perseverance model with separated wheel hubs; prepared by Emre (`scripts/split-rover-wheels.py`), original NASA conditions retained.
 - `public/art/eva-tablet-grip-*.svg`: Emre branch original EVA grip artwork, CC0 1.0. Samet display and local notifications retained.
 - Communications tower, facility computers and particle effects: team procedural source from Emre `feature/pro-rebuild` commit 097c3aa; local facility positions and original resource calculations preserved.
@@ -102,3 +103,7 @@ Rover lens adaptation: `src/colony/ova/assets.mjs` disables screen-space transmi
 Battery enclosure and cable terminal geometry: adapted visual portions of Emre/İhan solar-farm and power-cables sources at 097c3aa. Their new microgrid rules are not imported. Long cable runs are buried and not drawn. Rover dock is a new procedural concept; 250 W charging is a game assumption, with delivered kWh deducted from the existing support energy budget.
 
 Power integration preview uses NASAYarismasi/-lhan branch son, commit 97bc753. Original power, panel-production, recovery and projection modules preserved.
+
+## Samet ana menüsü
+
+Menü arayüzü ve açılış sahnesi [Samet’in kol-ekrani dalından](https://github.com/NASAYarismasi/Samet/tree/codex/kol-ekrani) alındı ve görev seçimine bağlandı. `public/art/mars-nasa.jpg`, [NASA/JPL-Caltech Mars modeli sayfasında](https://science.nasa.gov/3d-resources/mars/) yayımlanan Viking görüntülerinden işlenmiş USGS dokusudur. `public/art/astronaut-lineup.png`, aynı dalda yer alan, ImageGen ile üretilmiş seçme ekranı portreleridir.

@@ -7,7 +7,7 @@ import {createAirState} from '../src/sim/ihanLifeSupportModels.js';
 it('automatically attenuates daylight gradually and cleans rows at different times',()=>{
   const power=createPowerController();
   const frames=[];
-  for(let second=0;second<=780;second+=5){
+  for(let second=0;second<=1260;second+=5){
     power.update({unixSeconds:second,lmst:8},true);
     frames.push(power.telemetry);
   }
@@ -19,7 +19,8 @@ it('automatically attenuates daylight gradually and cleans rows at different tim
   const staggered=frames.find(frame=>frame.strokes[0]>0&&frame.strokes[5]===0);
   expect(staggered?.cleaning).toBe(true);
   expect(at(720).dust).toBeLessThan(at(480).dust);
-  expect(at(720).cleaning).toBe(false);
+  expect(at(720).cleaning).toBe(true);
+  expect(at(1260).cleaning).toBe(false);
   expect(new Set(at(720).live.groups.map(group=>group.pv)).size).toBe(5);
 });
 

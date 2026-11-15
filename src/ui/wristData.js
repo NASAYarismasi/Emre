@@ -5,7 +5,7 @@ import { roles } from '../colony/mars-koloni.mjs';
 import { PHASE_LABELS } from './flightAdapters.js';
 import { nextEvent } from './presentation.js';
 
-// Read-only UI projections. Flight mass uses NASA BVAD rates from sls.js;
+// Read-only UI projections. Flight mass uses NASA Ames rates from sls.js;
 // colony units are person-sols, as defined in landingPayload.js (not kilograms).
 const finite = value => Number.isFinite(value) ? value : null;
 const stock = value => Number.isFinite(value) ? Math.max(0, value) : null;

@@ -89,3 +89,13 @@ it('flies B/deorbit and EDL from the chapter through a safe landing and the unch
   scenario.step(1);
   expect(scenario.state.time).toBe(before);
 });
+
+it('enters transfer at nominal TMI cutoff and retains the pre-transfer flight history', () => {
+  const mission=createScenario('transfer');
+  expect(mission.state.phase).toBe('CRUISE');
+  expect(mission.state.cruiseTime).toBe(0);
+  expect(mission.state.burnRemaining).toBe(0);
+  expect(mission.state.events.some(event=>event.type==='TMI_BURN')).toBe(true);
+  expect(mission.state.transit.propellant).toBeLessThan(TRANSIT.propellantMass);
+  expect(mission.advanceCoast(DAY)).toBe(DAY);
+});

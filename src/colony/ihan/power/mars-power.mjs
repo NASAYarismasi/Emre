@@ -10,11 +10,13 @@ export function solarDay(season=0) {
   const irradiance=1361/distance**2
   const horizontal=irradiance*SOL_HOURS/Math.PI/1000*
     (sunset*Math.sin(latitude)*Math.sin(declination)+Math.cos(latitude)*Math.cos(declination)*Math.sin(sunset))
-  return {daylight,night:SOL_HOURS-daylight,sunset,declination,clearIrradiation:horizontal*.70}
+  return {daylight,night:SOL_HOURS-daylight,sunset,declination,irradiance,clearIrradiation:horizontal*.70}
 }
 export const DAYLIGHT_HOURS=solarDay().daylight
 // Six 1.28 ï¿½ 2.37 m growing trays; algae lights are a separate auxiliary load.
 export const LED_KW=6*1.28*2.37*350/(2.5*.8*1000)+.18
+export const IRRIGATION_L_PER_H=.6 // GAME ASSUMPTION: six beds, 14.8 L per Mars sol at full duty.
+export const IRRIGATION_KW=.12 // GAME ASSUMPTION: greenhouse circulation pump.
 export const LED_KWH=LED_KW*DAYLIGHT_HOURS
 export const TANK_L=100
 export const ICE_FRACTION=.10
@@ -53,13 +55,14 @@ export function feederLoss(kw,length,area,pf=GRID.powerFactor) {
 export const CABINET_HEATER_KW=1.25
 export const HABITAT_FEEDER_M=90
 
-export function nightReserveFor(hours) {
+export function nightReserveFor(hours,greenhouseKW=0) {
   const habitat=GRID.habitatKW*hours
   const heating=CABINET_HEATER_KW*hours
-  const cable=feederLoss(GRID.habitatKW,HABITAT_FEEDER_M,4)*hours
-  const load=habitat+heating+cable
+  const greenhouse=greenhouseKW*hours
+  const cable=(feederLoss(GRID.habitatKW,HABITAT_FEEDER_M,4,LOAD_PF.habitat)+feederLoss(greenhouseKW,105,4,LOAD_PF.greenhouse))*hours
+  const load=habitat+heating+greenhouse+cable
   const total=load/GRID.dischargeEfficiency
-  return {habitat,heating,cable,conversion:total-load,total}
+  return {habitat,heating,greenhouse,cable,conversion:total-load,total}
 }
 
 export function powerForecast(transmission,closed=true,options={}) {

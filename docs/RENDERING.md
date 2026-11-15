@@ -55,7 +55,7 @@ Uçuş sabitleri, ana aracın kuvvetleri, görev geçişleri ve ortak iniş yük
 
 Yerel arazi Jezero'nun yaklaşık 45 km çapındaki kenarını ve batı deltasını temsil eder; gerçek DEM değildir. Yakın yüzey ve 650 instanced kaya inişte ayrıntılanır; son kilometrede arazi dönen yüzeye sabitlenir. Gölge üreten tek ışık güneştir. Kamera 2, Mars'ta +Z yönündeki aşağı bakan iniş penceresine; kamera 3 yerel iniş sahasına geçer. Kamera 5 alçak inişte yer takibine geçer.
 
-Temas sonrası kamera kapıya yaklaşır, son 1,5 saniyede “Sol 1 · Jezero Krateri” kararması görünür; yaklaşık altıncı gerçek saniyede `saveLandingPayload()` ardından `colony.html` açılır. Enter/Boşluk ve `colony-btn` aynı geçişi atlatır; duraklatma sunum saatini de durdurur. Depolama başarısızsa otomatik geçiş durur ve düğme yeniden deneme için kalır. HUD eklemeleri `INIS` yorumlarıyla sınırlandırılmıştır; Q/Alt/L değiştirilmedi.
+Temas sonrası kamera kapıya yaklaşır, son 1,5 saniyede “Sol 1 · Jezero Krateri” kararması görünür; yaklaşık altıncı gerçek saniyede `saveLandingPayload()` ardından `colony.html` açılır. Enter veya Boşluk geçişi öne alabilir. Duraklatma sunum saatini de durdurur. Oturum depolaması başarısız olursa yeniden deneme düğmesi görünür. HUD eklemeleri `INIS` yorumlarıyla sınırlandırılmıştır; Q/Alt/L değiştirilmedi.
 
 İniş QA: plazmalı giriş, kalkan ayrılması, 1000 m bacak hareketi, son 30 m motor tozu, üç iniş kamerası, 0–6 s kapı yaklaşması/kararma, Enter/Boşluk ve otomatik geçiş sonrası gerçek uçuş kaynakları kontrol edilmelidir. Bu işçi paralel çalışma talimatı nedeniyle sunucu/tarayıcı/Playwright başlatmadı; görsel kontrol orkestratöre aittir.
 <!-- END INIS. -->

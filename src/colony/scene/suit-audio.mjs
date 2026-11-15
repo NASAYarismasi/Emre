@@ -1,6 +1,6 @@
 /** Procedural inside-helmet audio, no external assets. Artistic mix: GAME ASSUMPTION. */
-export function createSuitAudio() {
-  let context, master, fan, breath, noise, buffer, enabled = true, active = false
+export function createSuitAudio({muted=false,volume=1}={}) {
+  let context, master, fan, breath, noise, buffer, enabled = !muted, active = false
   const sources = []
   const onGesture = () => {
     if (!enabled || !active) return
@@ -9,7 +9,7 @@ export function createSuitAudio() {
     try {
       if (!context) {
         context = new Audio()
-        master = context.createGain(); master.gain.value = .22; master.connect(context.destination)
+        master = context.createGain(); master.gain.value = .22*volume; master.connect(context.destination)
         buffer = context.createBuffer(1, context.sampleRate*3, context.sampleRate)
         const samples = buffer.getChannelData(0)
         let seed = 9103, smooth = 0
@@ -34,8 +34,8 @@ export function createSuitAudio() {
   window.addEventListener('keydown', onGesture, { signal: controller.signal })
   return {
     get enabled() { return enabled },
-    toggle() { enabled = !enabled; if (enabled) onGesture(); if (master) master.gain.value = enabled && active ? .22 : 0; return enabled },
-    setActive(value) { active = value; if (master) master.gain.value = enabled && active ? .22 : 0 },
+    toggle() { enabled = !enabled; if (enabled) onGesture(); if (master) master.gain.value = enabled && active ? .22*volume : 0; return enabled },
+    setActive(value) { active = value; if (master) master.gain.value = enabled && active ? .22*volume : 0 },
     update(time) {
       if (context && breath && active && enabled) {
         const cycle = Math.sin(time*2*Math.PI/5.4)

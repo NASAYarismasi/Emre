@@ -53,13 +53,13 @@ export function stepLifeSupport(support, seconds) {
   return s;
 }
 
-export function syncLifeSupport(support, previous, next) {
+export function syncLifeSupport(support, previous, next, { simulate = true } = {}) {
   if (next.sol < previous.sol) return createLifeSupport(next);
   let s = { ...support, crew: crewCount(next) };
   if (next.sol > previous.sol) {
     // Complete the newly calculated sol using its actual storm/generation/load row.
     s.budget = lifePowerBudget(next, previous);
-    s = stepLifeSupport(s, Math.max(0, LIFE_SOL_SECONDS - s.elapsedInSol));
+    if (simulate) s = stepLifeSupport(s, Math.max(0, LIFE_SOL_SECONDS - s.elapsedInSol));
     s = { ...s, sol: next.sol, elapsedInSol: 0, spentKWh: 0, budget: lifePowerBudget(next) };
   }
   return s;

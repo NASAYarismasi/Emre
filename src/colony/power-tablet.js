@@ -1,59 +1,114 @@
-import {MOXIE_TANK_KG,moxieTankFull} from "./ihan/power/live-grid.mjs";
-const format=value=>Number.isFinite(value)?value.toLocaleString('tr-TR',{maximumFractionDigits:2}):'—';
-export function mountPowerTablet(onOpen){
-  const panel=document.createElement('section');panel.className='colony-drawer';panel.hidden=true;
-  panel.innerHTML='<h2>Enerji dağıtımı</h2><div data-controls></div><div data-readings></div><button data-report>İki sondaj kararını karşılaştır</button><div data-results></div>';
-  document.body.append(panel);
-  const controller=new AbortController(),on=(node,type,fn)=>node.addEventListener(type,fn,{signal:controller.signal});
-  let latest=null;
-  const controls=panel.querySelector('[data-controls]');
-  for(const [key,label]of [['closed','Ana şalter'],['drill','Sondaj'],['lamp','Sera LED izni'],['blackStart','İlk gece otomatik kurtarma']]){
-    const button=document.createElement('button');button.dataset.control=key;button.textContent=label;
-    on(button,'click',()=>window.dispatchEvent(new CustomEvent('colony:power-command',{detail:{key,value:!latest?.controls[key]}})));controls.append(button);
-  }
-  const select=document.createElement('select');select.setAttribute('aria-label','Mars mevsimi');
-  for(const [value,label]of [[0,'Ekinoks'],[90,'Kuzey yazı'],[180,'Sonbahar'],[270,'Kuzey kışı']]){const option=document.createElement('option');option.value=value;option.textContent=label;select.append(option);}
-  on(select,'change',()=>window.dispatchEvent(new CustomEvent('colony:power-command',{detail:{key:'season',value:Number(select.value)}})));controls.append(select);
-  on(window,'colony:state',event=>{
-    latest=event.detail?.lifeSupport?.electrical;
-    if(!latest||panel.hidden)return;
-    for(const button of controls.querySelectorAll('button')){const enabled=latest.controls[button.dataset.control];button.setAttribute('aria-pressed',String(enabled));}
-    const t=latest.live,s=latest.state;
-    const root=panel.querySelector('[data-readings]');root.replaceChildren();
-    const paragraph=text=>{const p=document.createElement('p');p.textContent=text;root.append(p);};
-    paragraph('Depo '+format(s.battery)+' / 180 kWh · PV '+format(t?.production)+' kW · Gece rezervi '+format(t?.reserve)+' kWh');
-    paragraph((latest.opacity>=.35?'Toz fırtınası':latest.opacity>.02?'Tozlu hava':'Açık hava')+' · Panellere ulaşan ışık %'+format(latest.transmission*100)+(latest.cleaning?' · Silecekler çalışıyor':''));
-    paragraph('kW anlık gücü, kWh biriken veya harcanan enerjiyi gösterir.');
-    paragraph('Panel tozu %'+format(latest.dust*100)+' · Kabin '+format(s.temperature)+' °C · Habitat açığı '+format(s.dailyShortfall)+' kWh');
-    const table=document.createElement('table');
-    for(const [index,g]of (t?.groups??[]).entries()){
-      const row=document.createElement('tr');
-      for(const value of ['G'+(index+1),format(g.stored)+' kWh','Güneş '+format(g.pv)+' kW','Bataryaya '+format(g.charge)+' kW','Bataryadan '+format(g.draw)+' kW','AC '+format(g.output)+' kW',format(g.kvar)+' kvar',format(Math.hypot(g.output??0,g.kvar??0))+' kVA']){
-        const cell=document.createElement('td');cell.textContent=value;row.append(cell);
-      }table.append(row);
-    }root.append(table);
-    for(const key of ['habitat','water','moxie','greenhouse']){
-      const m=t?.[key];
-      if(!m)continue;
-      const label={habitat:'Yaşam alanı',water:'Buz sondajı',moxie:'MOXIE',greenhouse:'Sera'}[key];
-      const sources=m.sources?.length?' · Besleyen '+m.sources.map(id=>'G'+id).join(', '):'';
-      if(key==='water'&&m.tankHold)paragraph('Su tankı doldu. Sondaj 95 L’ye kadar beklemede · '+(m.lineEnergized?'Besleme hattı açık':'Besleme hattı enerjisiz')+' · G1 bataryasına '+format(t.groups[0].charge)+' kW giriyor.');
-      paragraph(label+(m.duty>0?' çalışıyor':' beklemede')+' · Cihaz '+format(m.consumption)+' kW kullanıyor · Kabloda '+format(m.loss*1000)+' W kayıp'+sources);
-      paragraph('Hat çıkışı '+format(m.supply)+' kW · Akım '+format(m.current)+' A · Reaktif güç '+format(m.kvar)+' kvar · Toplam cihaz yükü '+format(m.kva)+' kVA · Güç faktörü '+format(m.pf));
-    }
-    paragraph('AC bara desteği '+format(t?.transferKW)+' kW');
-    for(const transfer of t?.transfers??[])paragraph('G'+transfer.from+' → G'+transfer.to+' · '+format(transfer.kw)+' kW');
-    for(const [i,g]of (t?.groups??[]).entries())paragraph('G'+(i+1)+' panel aralığı '+format(g.weakest*1000)+'–'+format(g.strongest*1000)+' W · %80 altında '+(g.lowPanels??0)+' panel');
-    paragraph('MOXIE · O₂ üretimi '+format((t?.gas?.oxygenKgHour??0)*1000)+' g/sa · Toplam tank '+format(s.oxygen)+' / '+MOXIE_TANK_KG+' kg'+(moxieTankFull(s.oxygen)?' · Tanklar dolu, beklemede':''))
-    paragraph('MOXIE → Habitat · Aktarım '+format(s.oxygenTransferKgHour*1000)+' g/sa · Toplam aktarılan '+format(s.oxygenToHabitat*1000)+' g');
-    paragraph('Sera toplamı · Net O₂ '+format((t?.plantGas?.netKgHour??0)*1000)+' g/sa · Birikimli net '+format(s.greenhouseNetKg*1000)+' g')
+import { GRID } from './ihan/power/mars-power.mjs';
+import { MOXIE_TANK_KG, moxieTankFull } from './ihan/power/live-grid.mjs';
 
-    for(const message of latest.log)paragraph(message);
-  });
-  on(panel.querySelector('[data-report]'),'click',()=>window.dispatchEvent(new CustomEvent('colony:power-command',{detail:{key:'forecast'}})));
+const format=value=>Number.isFinite(value)?value.toLocaleString('tr-TR',{maximumFractionDigits:3}):'—';
+const read=(value,unit)=>format(value)+' '+unit;
+
+function appendTable(root,headers,rows){
+  const scroll=document.createElement('div');
+  scroll.className='power-detail-table';
+  const table=document.createElement('table');
+  const head=table.createTHead().insertRow();
+  for(const heading of headers){
+    const th=document.createElement('th');
+    th.scope='col';th.textContent=heading;head.append(th);
+  }
+  const body=table.createTBody();
+  for(const values of rows){
+    const tr=body.insertRow();
+    for(const value of values)tr.insertCell().textContent=value;
+  }
+  scroll.append(table);
+  root.append(scroll);
+}
+
+export function mountPowerTablet(onOpen){
+  const panel=document.createElement('section');
+  panel.className='colony-drawer';panel.hidden=true;
+  panel.innerHTML='<h2>Elektrik ve enerji tüketimi</h2><div data-readings></div><h3>Şebeke ayarları</h3><div data-controls></div><button data-report>İki sondaj kararını karşılaştır</button><div data-results></div>';
+  document.body.append(panel);
+  const controller=new AbortController();
+  const on=(node,type,fn)=>node.addEventListener(type,fn,{signal:controller.signal});
+  const command=(key,value)=>window.dispatchEvent(new CustomEvent('colony:power-command',{detail:{key,value}}));
+  let latest;
+  const controls=panel.querySelector('[data-controls]');
+  for(const [key,label] of [['closed','Tesis şalteri'],['drill','Sondaj'],['blackStart','İlk gece arıza tatbikatı']]){
+    const button=document.createElement('button');
+    button.type='button';button.dataset.control=key;button.textContent=label;
+    on(button,'click',()=>command(key,!latest?.controls[key]));
+    controls.append(button);
+  }
+  const select=document.createElement('select');
+  select.setAttribute('aria-label','Tahmin mevsimi');
+  for(const [value,label] of [[0,'Ekinoks'],[90,'Kuzey yazı'],[180,'Sonbahar'],[270,'Kuzey kışı']]){
+    const option=document.createElement('option');option.value=value;option.textContent='Tahmin · '+label;select.append(option);
+  }
+  on(select,'change',()=>command('season',Number(select.value)));
+  controls.append(select);
+  const sweep=document.createElement('button');
+  sweep.type='button';sweep.textContent='Silecekleri çalıştır';
+  const sweepStatus=document.createElement('p');
+  sweepStatus.setAttribute('role','status');
+  on(sweep,'click',()=>command('sweep'));
+  on(window,'colony:sweep-status',event=>{sweepStatus.textContent=event.detail;});
+  controls.after(sweep,sweepStatus);
+
+  function render(){
+    if(panel.hidden||!latest)return;
+    for(const button of controls.querySelectorAll('button')){
+      button.setAttribute('aria-pressed',String(latest.controls[button.dataset.control]));
+    }
+    if(document.activeElement!==select)select.value=latest.controls.season;
+    const {live,state,flow}=latest;
+    const root=panel.querySelector('[data-readings]');
+    const scrollOffsets=[...root.querySelectorAll('.power-detail-table')].map(node=>node.scrollLeft);
+    root.replaceChildren();
+    const add=(tag,content)=>{
+      const element=document.createElement(tag);element.textContent=content;root.append(element);
+    };
+    add('p',live?.recovering?'Acil şebeke':live?.daylight?'Gündüz · Güneş tarlası':'Gece · Batarya beslemesi');
+    add('p','Güneş üretimi '+read(flow.solar,'kW')+' · Güneşten baraya '+read(flow.solarToBus,'kW')+' · Kullanılamayan '+read(flow.curtailed,'kW'));
+    add('p','Anlık cihaz tüketimi '+read(flow.totalConsumption,'kW')+' · Kablo kaybı '+read(flow.feederLoss,'kW')+' · Dönüşüm kaybı '+read(flow.totalConversionLoss,'kW'));
+    add('p','Batarya '+read(state.battery,'kWh')+' / '+read(GRID.capacity,'kWh')+' · Gereken gece rezervi '+read(live?.reserve,'kWh')+' · İnişte gelen '+read(state.initialEnergy,'kWh'));
+    add('p','Bataryaya giren '+read(flow.charging,'kW')+' · Bataryadan çıkan '+read(flow.totalDischarge,'kW')+' · Bataryadan AC baraya '+read(flow.batteryToBus,'kW'));
+    add('p','Görev toplamı · Güneş '+read(state.energy.solar,'kWh')+' · Kullanılamayan güneş '+read(state.energy.curtailed,'kWh')+' · Kablo ve dönüşüm kaybı '+read(state.energy.feederLoss+state.energy.conversionLoss,'kWh'));
+    add('h3','Cihaz tüketimi');
+    const loadRows=[['habitat','Yaşam alanı'],['water','Buz sondajı'],['moxie','MOXIE'],['greenhouse','Sera']].map(([key,name])=>{
+      const meter=live?.[key];
+      return [name,read(meter?.consumption,'kW'),read(state.loadEnergy[key],'kWh'),read(meter?.loss,'kW'),meter?.sources?.map(id=>'G'+id).join(', ')||'—'];
+    });
+    loadRows.push(['Batarya ısıtıcısı',read(live?.heater,'kW'),read(state.loadEnergy.heater,'kWh'),'—','—'],
+      ['Rover şarjı',read(flow.roverKW,'kW'),read(state.loadEnergy.rover,'kWh'),'—','Batarya'],
+      ['Panel temizliği',latest.cleaning?'Temizlik sürüyor':'Beklemede',read(state.loadEnergy.cleaning,'kWh'),'—','Batarya']);
+    appendTable(root,['Cihaz','Anlık','Toplam','Hat kaybı','Kaynak'],loadRows);
+    add('p','Sera · Mor ışık '+read(live?.greenhouse?.ledKW??0,'kW')+' · Sulama pompası '+read(live?.greenhouse?.pumpKW??0,'kW'));
+    if(state.waterTankHold)add('p','Su tankı dolum sınırında durdu. Sondaj 95 L’de yeniden devreye girer.');
+    add('p','MOXIE O₂ · '+read(state.oxygen,'kg')+' / '+read(MOXIE_TANK_KG,'kg')+
+      (moxieTankFull(state.oxygen)?' · Dolu':state.oxygenTankHold?' · Yeniden başlatma seviyesi bekleniyor':''));
+    add('h3','Güneş ve batarya grupları');
+    appendTable(root,['Grup','Depo','PV','Şarj','Deşarj','AC çıkış','Reaktif güç','Görünür güç'],
+      (live?.groups??[]).map((g,index)=>['G'+(index+1),read(g.stored,'kWh'),read(g.pv,'kW'),
+        read(g.charge,'kW'),read(g.draw,'kW'),read(g.output,'kW'),read(g.kvar??0,'kvar'),read(Math.hypot(g.output,g.kvar??0),'kVA')]));
+    add('p','Gruplar arası AC aktarım '+read(live?.transferKW??0,'kW'));
+    for(const transfer of live?.transfers??[])add('p','G'+transfer.from+' → G'+transfer.to+' · '+read(transfer.kw,'kW'));
+    add('p','Silecekler · '+(latest.cleaning?'Çalışıyor':'Hazır'));
+    add('p','Panellere ulaşan ışık %'+format(latest.transmission*100)+' · Panel yüzeyi toz oranı %'+format(latest.dust*100));
+    if(latest.log.length)add('h3','Şebeke olayları');
+    for(const message of latest.log)add('p',message);
+    root.querySelectorAll('.power-detail-table').forEach((node,index)=>node.scrollLeft=scrollOffsets[index]??0);
+  }
+
+  on(window,'colony:state',event=>{latest=event.detail?.lifeSupport?.electrical;render();});
+  on(panel.querySelector('[data-report]'),'click',()=>command('forecast'));
   on(window,'colony:power-report',event=>{
     const results=panel.querySelector('[data-results]');results.replaceChildren();
-    for(const [name,rows]of Object.entries(event.detail)){const p=document.createElement('p');p.textContent=(name==='drillOn'?'Sondaj açık':'Sondaj kapalı')+' · '+rows.map((r,i)=>'Sol '+(i+1)+': depo '+format(r.stored)+' kWh / habitat açığı '+format(r.gap)+' kWh / su '+format(r.water)+' L / O₂ '+format(r.oxygen)+' kg / ışık '+format(r.led)+' sa').join(' | ');results.append(p);}
+    for(const [name,rows] of Object.entries(event.detail)){
+      const p=document.createElement('p');
+      p.textContent=(name==='drillOn'?'Sondaj açık':'Sondaj kapalı')+' · '+rows.map((row,index)=>
+        'Sol '+(index+1)+': depo '+read(row.stored,'kWh')+' / habitat açığı '+read(row.gap,'kWh')+
+        ' / su '+read(row.water,'L')+' / O₂ '+read(row.oxygen,'kg')+' / ışık '+read(row.led,'sa')).join(' | ');
+      results.append(p);
+    }
   });
-  return {open(){onOpen(panel);},dispose(){controller.abort();panel.remove();}};
+  return {open(){onOpen(panel);render();},dispose(){controller.abort();panel.remove();}};
 }

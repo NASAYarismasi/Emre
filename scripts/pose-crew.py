@@ -20,32 +20,43 @@ for o in objects:
         p = transform @ v.co
         v.co = Vector(((p.x-(lo.x+hi.x)/2)*scale, (p.y-(lo.y+hi.y)/2)*scale, (p.z-lo.z)*scale))
 
+def smooth(start, end, value):
+    t = max(0, min(1, (value-start)/(end-start)))
+    return t*t*(3-2*t)
+
 # Optional diagnostic view, before baking.
 import sys
 inspect = '--inspect' in sys.argv
 if not inspect:
-    # Original suit faces -Y in Blender. Bend legs forward at the hip, then
-    # bend the shins down at the knee. Arms rotate as complete limb regions.
+    # Blend rotations across the cuffs, knees and hips to preserve continuous suit surfaces.
+    recline = Matrix.Rotation(math.radians(-24), 3, 'X')
+    torso_pivot = Vector((0, 0, .91))
+    shoulders = {side: Matrix.Rotation(side*math.radians(78), 3, 'Y') for side in (-1, 1)}
+    hip_rotation = Matrix.Rotation(math.radians(-88), 3, 'X')
     for o in objects:
         for v in o.data.vertices:
-            p = v.co.copy()
-            if abs(p.x) > .29 and p.z > 1.02:
-                side = 1 if p.x > 0 else -1
-                shoulder = Vector((side*.235, 0, 1.40))
-                p = shoulder + Matrix.Rotation(side*math.radians(78), 3, 'Y') @ (p-shoulder)
-                # Elbows tucked alongside the torso; hands lie over the thighs.
-                if p.z < 1.03:
-                    elbow = Vector((side*.36, 0, 1.05))
-                    p = elbow + Matrix.Rotation(math.radians(-65), 3, 'X') @ (p-elbow)
-            elif p.z < .91:
-                hip = Vector((p.x, 0, .91))
-                if p.z < .46:
-                    knee = Vector((p.x, 0, .46))
-                    p = knee + Matrix.Rotation(math.radians(88), 3, 'X') @ (p-knee)
-                p = hip + Matrix.Rotation(math.radians(-88), 3, 'X') @ (p-hip)
-            # Recline the entire seated body 24 degrees from vertical.
-            pivot = Vector((0,0,.91))
-            v.co = pivot + Matrix.Rotation(math.radians(-24), 3, 'X') @ (p-pivot)
+            point = v.co.copy()
+            x = abs(point.x)
+            side = 1 if point.x > 0 else -1
+            shoulder_weight = smooth(.195, .355, x)*smooth(1.15, 1.30, point.z)*(1-smooth(-.035, .025, point.y))
+            distal_weight = smooth(.325, .40, x)*smooth(1.12, 1.20, point.z)
+            arm_weight = shoulder_weight*(1-distal_weight)+distal_weight
+            leg_weight = (1-smooth(.85, 1.0, point.z))*(1-smooth(.098, .145, point.y))
+            if arm_weight:
+                shoulder = Vector((side*.237, -.085, 1.38))
+                upper_arm = shoulders[side]
+                elbow = shoulder+upper_arm@(Vector((side*.49, -.085, 1.36))-shoulder)
+                lowered = shoulder+upper_arm@(point-shoulder)
+                elbow_rotation = Matrix.Rotation(math.radians(-65)*smooth(.43, .58, x), 3, 'X')
+                posed = elbow+elbow_rotation@(lowered-elbow)
+                point = point.lerp(posed, arm_weight)
+            if leg_weight:
+                hip = Vector((point.x, 0, .91))
+                knee = Vector((point.x, 0, .46))
+                knee_rotation = Matrix.Rotation(math.radians(88)*(1-smooth(.36,.56,point.z)), 3, 'X')
+                bent = knee+knee_rotation@(point-knee)
+                point = point.lerp(hip+hip_rotation@(bent-hip), leg_weight)
+            v.co = torso_pivot+recline@(point-torso_pivot)
         o.data.update()
     bpy.ops.object.select_all(action='DESELECT')
     for o in objects: o.select_set(True)

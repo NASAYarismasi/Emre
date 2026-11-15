@@ -11,8 +11,9 @@ export function updateWaterTankHold(grid) {
 
 export function advanceFacilityWater(state,hours,live,crew) {
   const drillKW=live.water?.consumption??0
+  const extractionDuty=drillKW/DRILL_KW
   const recycleKW=.3*(live.habitat?.duty??0)
-  return stepWater(state,hours,{powerKW:drillKW+recycleKW,extract:drillKW>=DRILL_KW},{
+  return stepWater(state,hours,{powerKW:drillKW+recycleKW,extract:drillKW>0,extractionDuty,irrigationLiters:live.greenhouse?.irrigationL??0},{
     ...WATER_DEFAULTS,crew,tankCapacityL:TANK_L,litersPerHour:DRILL_KW/WATER_KWH_PER_L,
     iceWaterFraction:ICE_FRACTION,captureEfficiency:CAPTURE
   })

@@ -53,7 +53,7 @@
 @media(max-height:780px){#launch-card{top:8%}#launch-card h1{font-size:66px}.title-eyebrow{margin-bottom:20px}.title-rule{margin:20px 0 15px}.title-team{margin-top:20px}.title-actions{margin-top:18px}#wrist-computer{bottom:165px;transform:scale(.88);transform-origin:bottom right}}
 @media(max-width:750px){#launch-card{left:8%;top:12%;width:84%;max-width:420px}#launch-card h1{font-size:64px}#launch-card .title-subtitle{font-size:11px}.title-actions{width:280px}.camera-nav #watch-btn{font-size:7px;padding:0 7px}#wrist-computer{right:12px;width:280px}.team-cards{gap:9px}.team-cards span{font-size:9px}}
 
-.mission-action.colony-action{background:#e8a27a;color:#2a160d;border-color:#e8a27a;font-weight:700}
+.mission-action.colony-action{z-index:16;background:#e8a27a;color:#2a160d;border-color:#e8a27a;font-weight:700}
 
 /* BOLUM: chapter menu only; keep the flight and wrist layouts independent. */
 #launch-card{max-height:88vh;overflow-y:auto;pointer-events:auto;padding:0 8px 20px 0;scrollbar-width:thin;scrollbar-color:#8ba8b655 transparent}

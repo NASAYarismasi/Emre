@@ -6,11 +6,11 @@ import { createMission } from './mission.js';
  * nominal mission at MOI cutoff. The ~259-day Hohmann coast uses its exact
  * duration (transfer.js), and life support also includes ascent and both burns.
  *
- * @param {'launch' | 'mars-orbit'} chapter
+ * @param {'launch' | 'transfer' | 'mars-orbit'} chapter
  * @returns {ReturnType<typeof createMission>}
  */
 export function createScenario(chapter) {
-  if (!['launch', 'mars-orbit'].includes(chapter)) throw new RangeError(`Unknown mission chapter: ${chapter}`);
+  if (!['launch', 'transfer', 'mars-orbit'].includes(chapter)) throw new RangeError(`Unknown mission chapter: ${chapter}`);
   const mission = createMission();
   if (chapter === 'launch') return mission;
 
@@ -18,7 +18,7 @@ export function createScenario(chapter) {
   // Match the mission's 50 Hz integration; only the analytical cruise is batched.
   // GAME ASSUMPTION: execution guard, not an elapsed-time phase transition.
   for (let tick = 0; tick < 300000; tick++) {
-    if (mission.state.phase === 'MARS_ORBIT') return mission;
+    if (mission.state.phase === (chapter === 'transfer' ? 'CRUISE' : 'MARS_ORBIT')) return mission;
     if (mission.state.phase === 'FAILED') break;
     if (mission.state.phase === 'PARKING_ORBIT') mission.burn();
     if (mission.state.phase === 'CRUISE') {
@@ -27,5 +27,5 @@ export function createScenario(chapter) {
     }
     mission.step(.02);
   }
-  throw new Error(`Nominal mission did not reach Mars orbit: ${mission.state.failureReason ?? mission.state.phase}`);
+  throw new Error(`Nominal mission did not reach the requested chapter: ${mission.state.failureReason ?? mission.state.phase}`);
 }

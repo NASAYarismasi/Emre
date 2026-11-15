@@ -52,14 +52,19 @@ describe('surface environment integration', () => {
     environment.sync(createColony(exampleLanding),'Sıfırla');
     expect(environment.telemetry.lmst).toBeCloseTo(8,5);
   });
-  it('illuminates night with the camera lamp, respects L, and strongly attenuates sunlight in storms', () => {
+  it('illuminates night with the camera lamp, respects L, and keeps daylight readable through dusty haze', () => {
     const environment=createEnvironment(scene,camera,canvas); dispose=()=>environment.dispose();
     environment.setFPS(true); environment.sync(createColony(exampleLanding),'');
     const sun=scene.getObjectByProperty('isDirectionalLight',true);
     const lamp=camera.getObjectByProperty('isSpotLight',true);
     const clearIntensity=sun.intensity;
+    const ambient=scene.getObjectByProperty('isHemisphereLight',true);
+    const clearAmbient=ambient.intensity;
     environment.sync({...createColony(exampleLanding),timeline:[{storm:true}]},'');
-    expect(sun.intensity).toBeLessThan(clearIntensity*.1);
+    expect(sun.intensity).toBeLessThan(clearIntensity);
+    expect(sun.intensity).toBeGreaterThan(clearIntensity*.5);
+    expect(ambient.intensity).toBeGreaterThan(clearAmbient);
+    expect(scene.getObjectByName('Windblown Mars dust').visible).toBe(true);
     expect(scene.fog.density).toBeGreaterThan(.01);
     environment.sync(createColony(exampleLanding),'');
     environment.update(300); // 08:00 → 20:00 LMST, half a sol.
@@ -85,6 +90,21 @@ describe('surface environment integration', () => {
     expect(scene.getObjectByName('Mars_environment')).toBeUndefined();
     expect(camera.children).toHaveLength(0);
     key('BracketRight'); expect(environment.telemetry.warp).toBe(1);
+  });
+  it('moves between night and day without running the Mars clock backwards', () => {
+    const environment=createEnvironment(scene,camera,canvas);
+    dispose=()=>environment.dispose();
+    const arrival=environment.telemetry.unixSeconds;
+    environment.setPaused(true);
+    environment.setPeriod('night');
+    const midnight=environment.telemetry.unixSeconds;
+    expect(midnight).toBeGreaterThan(arrival);
+    expect(environment.telemetry.sunElevationDeg).toBeLessThan(0);
+    environment.setPeriod('night');
+    expect(environment.telemetry.unixSeconds).toBe(midnight);
+    environment.setPeriod('day');
+    expect(environment.telemetry.unixSeconds).toBeGreaterThan(midnight);
+    expect(environment.telemetry.sunElevationDeg).toBeGreaterThan(0);
   });
 });
 describe('FPS movement and terrain contracts', () => {

@@ -58,7 +58,7 @@ export function createFirstPerson(canvas, camera, { onMode, onAim, interact, acc
     if (active && event.target===canvas && event.buttons===1) turn(event.movementX,event.movementY)
   }, options)
   document.addEventListener("keydown", event => {
-    if(active && ["AltLeft","AltRight"].includes(event.code)){
+    if(active && document.activeElement===canvas && event.code==="KeyV"){
       freeLook=true;event.preventDefault();return;
     }
     // Tablet keys belong to the wrist worker: release movement and pointer, leave the event available.
@@ -79,7 +79,7 @@ export function createFirstPerson(canvas, camera, { onMode, onAim, interact, acc
   }, options)
   document.addEventListener("keyup", event => {
     keys.delete(event.code);
-    if(["AltLeft","AltRight"].includes(event.code)){freeLook=false;event.preventDefault();}
+    if(event.code==="KeyV"){freeLook=false;event.preventDefault();}
   }, options)
   document.addEventListener("pointerlockchange", () => {
     clearKeys();
@@ -118,7 +118,7 @@ export function createFirstPerson(canvas, camera, { onMode, onAim, interact, acc
   return {
     get active() { return active },
     get telemetry() { return {x:camera.position.x,y:camera.position.y,z:camera.position.z,grounded:vertical.grounded} },
-    setActive, respawn, teleport: lookFrom,
+    setActive, respawn, clearKeys, teleport: lookFrom,
     update(delta, updateAim = true) {
       if (!active) return
       accumulator += delta

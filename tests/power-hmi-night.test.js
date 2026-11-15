@@ -28,3 +28,18 @@ it('keeps low twilight readings consistent with the displayed kW and shows dayli
   expect(groupStatus({daylight:true,draw:0,charge:0,pv:.004})).toBe('Güneş üretimi yok');
   expect(groupStatus({daylight:true,draw:0,charge:.5,pv:1})).toBe('Batarya şarj oluyor');
 });
+
+it('keeps the live PV output independent of the forecast season selector',()=>{
+  const clock=atLocalTime(Date.UTC(2026,10,14)/1000,12*3600);
+  const output=season=>{
+    const power=createPowerController({blackStart:false});
+    power.controls.season=season;
+    for(const time of [clock,clock+30]){
+      const sun=marsSun(time);
+      power.update({unixSeconds:time,lmst:sun.lmst/3600,sunElevationDeg:sun.elevation*180/Math.PI},true);
+    }
+    return power.telemetry.live.production;
+  };
+  expect(output(0)).toBeGreaterThan(0);
+  expect(output(90)).toBeCloseTo(output(270),10);
+});
